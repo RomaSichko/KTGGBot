@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
+from random import randint
+import random
 from threading import Timer
 from time import sleep, time
+from cryptography.utils import _ModuleWithDeprecations
 # from typing_extensions import runtime
 import telebot
 import changePass
@@ -10,6 +13,26 @@ import codecs
 from datetime import datetime
 from telebot import types
 import json
+import smtplib
+import base_commands
+import re
+
+ 
+# Define a function for
+# for validating an Email
+ 
+ 
+def validMail(email):
+ 
+    regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+
+    if(re.fullmatch(regex, email)):
+        return True
+ 
+    else:
+        return False
+
+
 
 # test bot
 bot = telebot.TeleBot("")
@@ -37,6 +60,16 @@ teacher_call = {}
 
 admin_base = {}
 
+global mainIDMessage
+mainIDMessage = 291
+
+global mailAuth
+mailAuth = {}
+global teamsAuth
+teamsAuth = {}
+
+global lastnameNameAuth
+lastnameNameAuth = {}
 
 def delete_contact(msg):
     bot.delete_message(msg.chat.id, msg.id)
@@ -51,7 +84,7 @@ def send_welcome(message):
     )
     keyboard.row(
         telebot.types.InlineKeyboardButton('Скинути пароль', callback_data='reset-pass'),
-        telebot.types.InlineKeyboardButton('Для викладачів', callback_data='teacher')
+        telebot.types.InlineKeyboardButton('Для працівників', callback_data='teacher')
     )
     keyboard.row(
         telebot.types.InlineKeyboardButton('Написати адміністратору', callback_data='message-admin')
@@ -72,7 +105,7 @@ def main_menu(message):
     )
     keyboard.row(
         telebot.types.InlineKeyboardButton('Скинути пароль', callback_data='reset-pass'),
-        telebot.types.InlineKeyboardButton('Для викладачів', callback_data='teacher')
+        telebot.types.InlineKeyboardButton('Для працівників', callback_data='teacher')
     )
     keyboard.row(
         telebot.types.InlineKeyboardButton('Написати адміністратору', callback_data='message-admin')
@@ -87,6 +120,33 @@ def main_menu(message):
     log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action:' + message.text + ' \n')
     log.close()
 
+
+@bot.message_handler(commands=['account'])
+def myAccount(message):
+
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.row(
+        telebot.types.InlineKeyboardButton('Змінити ел. пошту', callback_data='acc-mail'),
+        telebot.types.InlineKeyboardButton('Змінити MS Teams', callback_data='acc-teams')
+        # telebot.types.InlineKeyboardButton('Змінити прізвище', callback_data='acc-lastname'),
+        # telebot.types.InlineKeyboardButton('Змінити ім\'я', callback_data='acc-name')
+    )
+
+    check = base_commands.checkUserInBase(message.chat.id)
+
+    if check:
+        
+        if base_commands.getValidTeams(message.chat.id):
+            keyboard.row(
+                telebot.types.InlineKeyboardButton('Скинути пароль', callback_data='acc-password')
+            )
+        uData = base_commands.getUserData(message.chat.id)
+        bot.send_message(message.chat.id, uData, reply_markup=keyboard)
+    else:
+        base_commands.addData(message.chat.id, message.chat.username)
+        bot.send_message(message.chat.id, "Ваші дані занесено до бази, перегляньте та допоповніть їх")
+        uData = base_commands.getUserData(message.chat.id)
+        bot.send_message(message.chat.id, uData, reply_markup=keyboard)
 
 @bot.message_handler(content_types=['photo'])
 def photo(message):
@@ -212,6 +272,12 @@ def callback_worker(call):
     global base_message
     global teacher_message
     global teacher_call
+    global mainIDMessage
+    global mailAuth
+    global teamsAuth
+    global lastnameNameAuth
+
+    # Main menu
 
     if call.data == "get-stud":
         keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=1)
@@ -248,7 +314,7 @@ def callback_worker(call):
             telebot.types.InlineKeyboardButton('Повернутися до меню', callback_data='but-menu')
         )
 
-        text = "1. Я не можу зайти, моя пошта ...@gmail.com (ukr.net,...)" + "\n" + "Відповідь: кожному студенту створено обліковий запис типу ...@kdktgg.onmicrosoft.com або ...@ktgg.kiev.ua, тільки під цим записом ви можете користуватися MS Teams" + '\n' + "2. Пароль невірний, я ввожу той що мені дав куратор" + "\n" + "Відповідь: при першому вході в свій акаунт ВСІ змінюють пароль на будь-який свій, тому при подальшому вході потрібно використовувати саме його" + '\n' + "3. Я не бачу груп у себе" + "\n" + "Відповідь: уважно перевірте чи зайши ви під акаунтом, що вам надали, якщо ні, то перезайдіть, так - зверніться до адміністратора" + '\n' + "4. Я не бачу занять у календарі" + "\n" + "Відповідь: уважно перевірте чи зайши ви під акаунтом, що вам надали, якщо ні, то перезайдіть, якщо вас додали пізніше, то заняття створені раніше в календарі не відображаються, підключатися до них можна через 'Команди'" + '\n' + '5. У мене залишився розклад минулого року' + '\n' + 'Відповідь: ви можете його видалити через \'Календар\''
+        text = "1. Я не можу зайти, моя пошта ...@gmail.com (ukr.net,...)" + "\n" + "Відповідь: кожному студенту створено обліковий запис типу ...@kdktgg.onmicrosoft.com або ...@ktgg.kiev.ua, тільки під цим записом ви можете користуватися MS Teams" + '\n' + "2. Пароль невірний, я ввожу той що мені дав куратор" + "\n" + "Відповідь: при першому вході в свій акаунт ВСІ змінюють пароль на будь-який свій, тому при подальшому вході потрібно використовувати саме його" + '\n' + "3. Я не бачу груп у себе" + "\n" + "Відповідь: уважно перевірте чи зайши ви під акаунтом, що вам надали, якщо ні, то перезайдіть, так - зверніться до адміністратора" + '\n' + "4. Я не бачу занять у календарі" + "\n" + "Відповідь: уважно перевірте чи зайши ви під акаунтом, що вам надали, якщо ні, то перезайдіть, якщо вас додали пізніше, то заняття створені раніше в календарі не відображаються, підключатися до них можна через 'Команди'" + '\n' + '5. У мене залишився розклад минулого року' + '\n' + 'Відповідь: ви можете його видалити через \'Календар\'' + '\n' + '6. У мене немає логіна' + '\n' + 'Відповідь: зверніться до куратора за логіном, у випадку відсутності у куратора зверніться до адміністратора' + '\n' + '7. Я втратив логін та пароль' + '\n' + 'Відповідь: можете скинути пароль і отримати логін, у випадку відсутності документів, зверніться до адміністраторів'
 
         bot.edit_message_text(text, call.message.chat.id, call.message.id, reply_markup=keyboard)
 
@@ -272,7 +338,7 @@ def callback_worker(call):
         )
         keyboard.row(
             telebot.types.InlineKeyboardButton('Скинути пароль', callback_data='reset-pass'),
-            telebot.types.InlineKeyboardButton('Для викладачів', callback_data='teacher')
+            telebot.types.InlineKeyboardButton('Для працівників', callback_data='teacher')
         )
         keyboard.row(
             telebot.types.InlineKeyboardButton('Написати адміністратору', callback_data='message-admin')
@@ -299,6 +365,52 @@ def callback_worker(call):
         base_message.update({call.message.chat.id:{}})
         base_message[call.message.chat.id].update({"message":True})
 
+    # Valid Mail
+    elif call.data == 'acc-mail':
+        keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=1)
+        item = types.KeyboardButton("Відмінити")
+        keyboard.row(item)
+        bot.send_message(call.message.chat.id, "Відправте адресу Вашої електронної пошти або відмініть дію", reply_markup=keyboard)
+
+        mailAuth.update({call.message.chat.id:{}})
+        mailAuth[call.message.chat.id].update({"auth":False, "code": None, "mail": None})
+    
+    elif call.data == 'acc-teams':
+        keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=1)
+        item = types.KeyboardButton("Відмінити")
+        keyboard.row(item)
+        bot.send_message(call.message.chat.id, "Відправте логін (...@ktgg.kiev.ua або ...@kdktgg.onmicrosoft.com) або відмініть дію", reply_markup=keyboard)
+
+        teamsAuth.update({call.message.chat.id:{}})
+        teamsAuth[call.message.chat.id].update({"auth":False, "code": None, "mail": None})
+
+    elif call.data == 'acc-lastname':
+        keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=1)
+        item = types.KeyboardButton("Відмінити")
+        keyboard.row(item)
+        bot.send_message(call.message.chat.id, "Відправте Ваше прізвище", reply_markup=keyboard)
+
+        lastnameNameAuth.update({call.message.chat.id:{}})
+        lastnameNameAuth[call.message.chat.id].update({"name":False, "lastname": True})
+    
+    elif call.data == 'acc-name':
+        keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=1)
+        item = types.KeyboardButton("Відмінити")
+        keyboard.row(item)
+        bot.send_message(call.message.chat.id, "Відправте Ваше ім\'я", reply_markup=keyboard)
+
+        lastnameNameAuth.update({call.message.chat.id:{}})
+        lastnameNameAuth[call.message.chat.id].update({"name":True, "lastname": False})
+
+    elif call.data == 'acc-password':
+        bot.edit_message_text("Зачекайте, йде пошук даних",call.message.chat.id, call.message.id)
+        teams = base_commands.getTeams(call.message.chat.id)
+        newData = changePass.resetPass_bot(teams)
+        msg = bot.send_message(call.message.chat.id,"Дані знайдено." + '\n' + "Ваш логін: " + newData[2] + "\n" + "Ваш тимчасовий пароль: " + newData[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу")
+        myAccount(msg)       
+
+
+    # Check admin online
     elif call.data == 'admin-online':
         base = json.load(codecs.open("admin.json", 'r', 'utf-8-sig'))
         baseStatus = {'🔴':'зайнятий', '🟠': 'не активний', '🟡': 'на парі', '🟢': 'вільний'}
@@ -317,6 +429,7 @@ def callback_worker(call):
 
         main_menu(msg)
 
+    # teacher menu
 
     elif call.data == 'teacher':
         keyboard = telebot.types.InlineKeyboardMarkup()
@@ -367,6 +480,7 @@ def callback_worker(call):
         teacher_call[call.message.chat.id].update({"isLog": False})
 
 
+    #admin menu
 
     elif call.data == "admin-quit":
         if call.message.chat.id in admin_base:
@@ -398,7 +512,13 @@ def callback_worker(call):
 
     elif call.data == "admin-send":
         if call.message.chat.id in admin_base:
-            bot.send_message(call.message.chat.id, "ID user / message")
+            base = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
+            # print(base)
+            for i in base:
+                if i['status'] == False:
+                    bot.send_message(call.message.chat.id, 'mainIDMessage: ' + str(i['mainIDMessage']) + '\n' + "id: " + str(i["id"]) + '\n' + 'username: ' + str(i['username']) + '\n' + 'From: ' + i['from'] + '\n' + 'Message: ' + i['message'])
+
+            bot.send_message(call.message.chat.id, "mainIDMessage / ID user / message")
             admin_base[call.message.chat.id]["id-message"] = True
             admin_base[call.message.chat.id]["pib"] = False
             admin_base[call.message.chat.id]["id"] = False
@@ -431,6 +551,10 @@ def reset_idcard(message):
     global admin_base
     global base_message
     global teacher_message
+    global mainIDMessage
+    global mailAuth
+    global lastnameNameAuth
+    global teamsAuth
 
     keyboard = telebot.types.InlineKeyboardMarkup()
     keyboard.row(
@@ -440,7 +564,7 @@ def reset_idcard(message):
     # if user_base_reset == {}:
     #     bot.send_message(message.chat.id,"Невідома команда")
     if message.text == "Відмінити":
-        if message.chat.id in user_base_reset or message.chat.id in base_message or message.chat.id in teacher_message or message.chat.id in teacher_call:
+        if message.chat.id in user_base_reset or message.chat.id in base_message or message.chat.id in teacher_message or message.chat.id in teacher_call or message.chat.id in teacher_base_reset or message.chat.id in mailAuth or message.chat.id in lastnameNameAuth or message.chat.id in teamsAuth:
             markup = types.ReplyKeyboardRemove(selective=False)
             msg = bot.send_message(message.chat.id, 'Ви повернулись до меню', reply_markup=markup)
 
@@ -466,6 +590,26 @@ def reset_idcard(message):
             elif message.chat.id in teacher_call:
                 try:
                     del(teacher_call[message.chat.id])
+                except KeyError:
+                    pass
+            elif message.chat.id in teacher_base_reset:
+                try:
+                    del(teacher_base_reset[message.chat.id])
+                except KeyError:
+                    pass
+            elif message.chat.id in mailAuth:
+                try:
+                    del(mailAuth[message.chat.id])
+                except KeyError:
+                    pass
+            elif message.chat.id in lastnameNameAuth:
+                try:
+                    del(lastnameNameAuth[message.chat.id])
+                except KeyError:
+                    pass
+            elif message.chat.id in teamsAuth:
+                try:
+                    del(teamsAuth[message.chat.id])
                 except KeyError:
                     pass
         return
@@ -618,8 +762,24 @@ def reset_idcard(message):
     elif message.chat.id in base_message:
         if base_message[message.chat.id]["message"]:
             markup = types.ReplyKeyboardRemove(selective=False)
+
+            base = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
+
+            
+
+            tempBase = {'mainIDMessage': mainIDMessage, "id": message.chat.id, 'username': message.chat.username,  "from": "Student", "status": False, "message": message.text}
+
+            base.append(tempBase)
+
+            # print(base)
+
+            with open("message.json", "w") as outfile:
+                json.dump(base, outfile)
+            
+            mainIDMessage += 1
+
             bot.send_message(message.chat.id,"Повідомлення надіслано адміністратору", reply_markup=markup)
-            bot.send_message(684828985,"id: " + str(message.chat.id) + '\n' + message.text)
+            # bot.send_message(684828985,"id: " + str(message.chat.id) + '\n' + message.text)
 
             bot.send_message(message.chat.id, "Продовжити роботу", reply_markup=keyboard)
             try:
@@ -662,10 +822,40 @@ def reset_idcard(message):
                 elif "id-message" in admin_base[message.chat.id] and admin_base[message.chat.id]["id-message"]:
                     m = message.text.split()
 
-                    if len(m) >= 2:
+                    if len(m) >= 3:
+
+                    # base = json.load(codecs.open("admin.json", 'r', 'utf-8-sig'))
+
+                    # for i in base:
+                    #     if i['status'] == False:
+                    #         bot.send_message(message.chat.id, "id: " + str(i["id"]) + '\n' + 'From: ' + i['from'] + '\n' + 'Message: ' + i['message'])
 
                         if m[0].isdigit():
-                            bot.send_message(int(m[0]),m[1:])
+                            base = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
+
+                            for i in base:
+                                if i['mainIDMessage'] == int(m[0]) and i['id'] == int(m[1]):
+                                    if i['status'] == False:
+                                        # print("Yes")
+
+                                        bot.send_message(int(m[1]), "Відповідь адміністратора: " + '\n' + ' '.join(m[2:]))
+                                        msg = bot.send_message(message.chat.id, "Повідомлення надіслано")
+                                        admin_panel(msg)
+
+                                        i['status'] = True
+                                        i['answer'] = ' '.join(m[2:])
+                                        i['admin'] = message.chat.id
+                                    else:
+                                        msg = bot.send_message(message.chat.id, "На повідомлення уже відповіли")
+                                        admin_panel(msg)
+
+                            
+                            with open("message.json", "w") as outfile:
+                                json.dump(base, outfile)
+
+
+                            # bot.send_message(int(m[0]),' '.join(m[1:]))
+                            # bot.send_message(message.chat.id, "Повідомлення успішно надіслано")
                             
 
                         else:
@@ -716,9 +906,23 @@ def reset_idcard(message):
 
         elif teacher_message[message.chat.id]["isLog"]:
             markup = types.ReplyKeyboardRemove(selective=False)
+            base = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
+
+            
+
+            tempBase = {'mainIDMessage': mainIDMessage, "id": message.chat.id, 'username': message.chat.username,  "from": "Teacher", "status": False, "message": message.text}
+
+            base.append(tempBase)
+
+            # print(base)
+
+            with open("message.json", "w") as outfile:
+                json.dump(base, outfile)
+            
+            mainIDMessage += 1
             bot.send_message(message.chat.id, "Ваше повідомлення надіслано адміністратору, чекайте на відповідь", reply_markup=markup)
 
-            bot.send_message(684828985,"id: " + str(message.chat.id) + '\n' + message.text)
+            # bot.send_message(684828985,"id: " + str(message.chat.id) + '\n' + message.text)
 
             bot.send_message(message.chat.id, "Продовжити роботу", reply_markup=keyboard)
 
@@ -802,6 +1006,77 @@ def reset_idcard(message):
         elif teacher_call[message.chat.id]["isLog"]:
             pass
 
+    elif message.chat.id in mailAuth:
+        if mailAuth[message.chat.id]["code"] == None:
+            if validMail(message.text):
+                password = str(randint(100000, 999999))
+                mailAuth[message.chat.id]["code"] = password
+                mailAuth[message.chat.id]["mail"] = message.text
+                changePass.mailSend(message.text, password)
+                bot.send_message(message.chat.id, "На Вашу електронну пошту надісланий код підтвердження (можливо воно потрапило в спам), надішліть його боту")
+            else:
+                bot.send_message(message.chat.id, "Ви ввели неіснуючу електронну пошту, надішліть правильну адресу або відмініть дію")
+        elif mailAuth[message.chat.id]["code"]:
+            if message.text == mailAuth[message.chat.id]["code"]:
+                markup = types.ReplyKeyboardRemove(selective=False)
+                base_commands.updateDataMail(message.chat.id, mailAuth[message.chat.id]["mail"])
+                msg = bot.send_message(message.chat.id, "Вашу електронну пошту підтвердженно, перегляньте Ваш акаунт", reply_markup=markup)
+                try:
+                    del(mailAuth[message.chat.id])
+                except KeyError:
+                    pass
+                myAccount(msg)
+            else:
+                bot.send_message(message.chat.id, "Введений код невірний, спробуйте ще раз або відмініть дію")
+
+    elif message.chat.id in teamsAuth:
+        if teamsAuth[message.chat.id]["code"] == None:
+            if validMail(message.text):
+                if message.text[message.text.find('@') + 1:] == "kdktgg.onmicrosoft.com" or message.text[message.text.find('@') + 1:] == "ktgg.kiev.ua":
+                    if changePass.validTeams(message.text):
+                        password = str(randint(100000, 999999))
+                        teamsAuth[message.chat.id]["code"] = password
+                        teamsAuth[message.chat.id]["mail"] = message.text
+                        changePass.mailSend(message.text, password)
+                        bot.send_message(message.chat.id, "Перейдіть за посиланням https://outlook.office.com/mail/inbox (якщо Вас просить увійти, вводьте дані від MS Teams), у листі від no-reply@ktgg.kiev.ua вказаний код, відправте його боту" + "\n" + "Якщо виникли проблеми, можете звернутися до адміністратора @Roma_Sichko")
+                    else:
+                        bot.send_message(message.chat.id, "Нам не вдалося знайти ваш обліковий запис, перевірте правильність введення даних і відправте ще раз або відмініть дію")
+                else:
+                    bot.send_message(message.chat.id, "Ви ввели невірний логін, надішліть правильний логін або відмініть дію")
+            else:
+                bot.send_message(message.chat.id, "Ви ввели неіснуючу електронну пошту, надішліть правильну адресу або відмініть дію")
+        elif teamsAuth[message.chat.id]["code"]:
+            if message.text == teamsAuth[message.chat.id]["code"]:
+                markup = types.ReplyKeyboardRemove(selective=False)
+                base_commands.updateDataTeams(message.chat.id, teamsAuth[message.chat.id]["mail"])
+                msg = bot.send_message(message.chat.id, "Ваш обліковий запіс підтверджено, Вам доступні нові дії в акаунті", reply_markup=markup)
+                try:
+                    del(teamsAuth[message.chat.id])
+                except KeyError:
+                    pass
+                myAccount(msg)
+            else:
+                bot.send_message(message.chat.id, "Введений код невірний, спробуйте ще раз або відмініть дію")
+
+    elif message.chat.id in lastnameNameAuth:
+        if lastnameNameAuth[message.chat.id]['lastname']:
+            markup = types.ReplyKeyboardRemove(selective=False)
+            base_commands.updateDataLastname(message.chat.id, message.text)
+            msg = bot.send_message(message.chat.id, "Ваші дані змінено, перегляньте свій акаунт", reply_markup=markup)
+            try:
+                del(lastnameNameAuth[message.chat.id])
+            except KeyError:
+                pass
+            myAccount(msg)
+        elif lastnameNameAuth[message.chat.id]['name']:
+            markup = types.ReplyKeyboardRemove(selective=False)
+            base_commands.updateDataName(message.chat.id, message.text)
+            msg = bot.send_message(message.chat.id, "Ваші дані змінено, перегляньте свій акаунт", reply_markup=markup)
+            try:
+                del(lastnameNameAuth[message.chat.id])
+            except KeyError:
+                pass
+            myAccount(msg)
 
     else:
         if message.chat.id == 684828985 or message.chat.id == 461655305 or message.chat.id == 365794368:
@@ -817,13 +1092,13 @@ def reset_idcard(message):
 
 
 
-while True:
-    try:
-        bot.polling(none_stop=True, interval=0)
+# while True:
+#     try:
+#         bot.polling(none_stop=True, interval=0)
             
-    except ConnectionResetError:
-        print("No conection")
-        sleep(5)
-    # print(1)
+#     except ConnectionResetError:
+#         print("No conection")
+#         sleep(5)
+#     # print(1)
     
-# bot.infinity_polling(True)
+bot.infinity_polling()
