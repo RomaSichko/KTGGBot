@@ -11,8 +11,11 @@ from datetime import datetime
 from telebot import types
 import json
 
-
+# test bot
 bot = telebot.TeleBot("")
+
+# main bot
+# bot = telebot.TeleBot("")
 
 global img_id
 img_id = 0
@@ -54,7 +57,7 @@ def send_welcome(message):
         telebot.types.InlineKeyboardButton('Написати адміністратору', callback_data='message-admin')
     )
     keyboard.row(
-        telebot.types.InlineKeyboardButton('Адміністратори онлайн', callback_data='admin-online')
+        telebot.types.InlineKeyboardButton('Адміністратори', callback_data='admin-online')
      )
     bot.send_message(message.chat.id, "Привіт, я КТГГ-бот, допоможу Вам в роботі з MS Teams." + '\n' + "Оберіть потрібний пункт меню для продовження роботи",reply_markup = keyboard)
     log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action:' + message.text + ' \n')
@@ -75,7 +78,7 @@ def main_menu(message):
         telebot.types.InlineKeyboardButton('Написати адміністратору', callback_data='message-admin')
     )
     keyboard.row(
-        telebot.types.InlineKeyboardButton('Адміністратори онлайн', callback_data='admin-online')
+        telebot.types.InlineKeyboardButton('Адміністратори', callback_data='admin-online')
      )
 
     bot.send_message(message.chat.id, "Оберіть подальшу дію", reply_markup=keyboard)
@@ -84,28 +87,6 @@ def main_menu(message):
     log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action:' + message.text + ' \n')
     log.close()
 
-# @bot.message_handler(commands=['help'])
-# def help_command(message):
-#     keyboard = telebot.types.InlineKeyboardMarkup()
-#     keyboard.row(
-#         telebot.types.InlineKeyboardButton('Повернутися до меню', callback_data='but-menu')
-#     )
-#     bot.send_message(message.chat.id, "Щоб змінити пароль відправ фото дійсного студентського квитка")
-#     bot.send_message(message.chat.id, "Якщо у вас виникли проблеми зі зміною пароля, введіть команду '/admin' та напишіть звернення до адміністратора. Ваш запит відразу буде надіслано адміністратору")
-#     bot.send_message(message.chat.id, "Правильне використання команди '/admin [твоє повідомлення]', не використовуйте команду '/admin' без повідомлення")
-#     bot.send_message(message.chat.id, "Основні правила користуваня: " + "\n" +  "1. Не спамити боту, у випадку спаму ваш акаунт буде заблокований." + "\n" + "2. Всі дані (особовий id, час відправлення та запит) зберігаються в базі, тому не рекомендовано використовувати нецензурну лексику та тому подібні речі." +  "\n" + "3. У випадку зміни не свого пароля (не стосується людей, у яких однакові ім'я та прізвище), ваш запит буде відправлено куратору з переліком даних запиту", reply_markup=keyboard)
-
-# @bot.message_handler(commands=['admin'])
-# def admin_send(message):
-#     file = codecs.open("messages.txt", "a", 'utf-8')
-#     a = str(message.text).split()
-#     if len(a) != 1:
-#         bot.send_message(message.chat.id, "Ваше повідомлення надіслане адміністратору, будь ласка, зачекайте на відповідь")
-#         bot.send_message(684828985, " ".join(message.text.split()[1:]) + "\n" + "id:" + str(message.chat.id))
-#         file.write(str(datetime.now()) + "\n" + "id: " + str(message.chat.id) + "\n" + "username: " + str(message.chat.username) + "\n" + message.text + "\n" + "==========================" + "\n")
-#     else:
-#         bot.send_message(message.chat.id, "Неправильне використання команди")
-#     file.close()
 
 @bot.message_handler(content_types=['photo'])
 def photo(message):
@@ -157,35 +138,6 @@ def photo(message):
         log.close()
     else:
         bot.send_message(message.chat.id, "Невідома дія")
-    
-# @bot.message_handler(commands=['resend_admin'])
-# def resend_message(message):
-#     m = message.text.split()
-#     bot.send_message(int(m[1]), " ".join(m[2:]))
-
-# @bot.message_handler(commands=['reset_admin'])
-# def resend_message(message):
-#     m = message.text.split()
-#     if len(m) == 5:
-#         if m[1] == "72847@a72847":
-#             newpass = changePass.resetPass_bot(m[2], m[3], m[4])
-#             bot.send_message(message.chat.id,"Логін: " + newpass[2] + "\n" + "Тимчасовий пароль: " + newpass[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу")
-#         else:
-#             bot.send_message(message.chat.id,"Невірні дані")
-#     else:
-#         bot.send_message(message.chat.id,"Невірні дані")
-
-# @bot.message_handler(commands=['faq'])
-# def resend_message(message):
-#     keyboard = telebot.types.InlineKeyboardMarkup()
-#     keyboard.row(
-#         telebot.types.InlineKeyboardButton('Повернутися до меню', callback_data='but-menu')
-#     )
-#     bot.send_message(message.chat.id, "1. Я не можу зайти, моя пошта ...@gmail.com (ukr.net,...)" + "\n" + "Відповідь: кожному студенту створено обліковий запис типу ...@kdktgg.onmicrosoft.com або ...@ktgg.kiev.ua, тільки під цим записом ви можете користуватися MS Teams")
-#     bot.send_message(message.chat.id, "2. Пароль невірний, я ввожу той що мені дав куратор" + "\n" + "Відповідь: при першому вході в свій акаунт ВСІ змінюють пароль на будь-який свій, тому при подальшому вході потрібно використовувати саме його")
-#     bot.send_message(message.chat.id, "3. Я не бачу груп у себе" + "\n" + "Відповідь: уважно перевірте чи зайши ви під акаунтом, що вам надали, якщо ні, то перезайдіть, так - зверніться до адміністратора (/admin [повідомлення])")
-#     bot.send_message(message.chat.id, "4. Я не бачу занять у календарі" + "\n" + "Відповідь: уважно перевірте чи зайши ви під акаунтом, що вам надали, якщо ні, то перезайдіть, якщо вас додали пізніше, то заняття створені раніше в календарі не відображаються, підключатися до них можна через 'Команди'")
-#     bot.send_message(message.chat.id, "5. При вході просить ввести код" + "\n" + "Відповідь: перевірте правильність введення логіну", reply_markup=keyboard)
 
 
 @bot.message_handler(commands=['admin_panel'])
@@ -253,15 +205,6 @@ def status(message):
     log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action:' + message.text + ' \n')
     log.close()
 
-# @bot.message_handler(commands=['reset'])
-# def exchange_command(message):
-#     keyboard = telebot.types.InlineKeyboardMarkup()
-#     keyboard.row(
-#         telebot.types.InlineKeyboardButton('Студентський квиток', callback_data='get-stud'),
-#         telebot.types.InlineKeyboardButton('ID карта', callback_data='get-idcard')
-#     )
-
-#     bot.send_message(message.chat.id, 'Оберіть тип верифікації: ', reply_markup=keyboard)
 
 @bot.callback_query_handler(func=lambda call: True) 
 def callback_worker(call):
@@ -287,7 +230,7 @@ def callback_worker(call):
         user_base_reset.update({call.message.chat.id:{}})
         user_base_reset[call.message.chat.id].update({"idcard":1})
 
-        bot.send_message(call.message.chat.id, "Для верифікації через ID картку, відправте ПІБ та останні чотири цифри номера паспорта" + '\n' + "Повідомлення повинно бути типу: Шевченко Тарас Григорович 0000. На всі інші типи повідомлень бот реагувати не буде", reply_markup=keyboard)
+        bot.send_message(call.message.chat.id, "Для верифікації через ID картку, відправте ПІБ та останні чотири цифри номера паспорта" + '\n' + "Повідомлення повинно бути типу: Шевченко Тарас Григорович 0000.", reply_markup=keyboard)
         bot.delete_message(call.message.chat.id, call.message.id)
 
     elif call.data == "rules":
@@ -295,8 +238,8 @@ def callback_worker(call):
         keyboard.row(
             telebot.types.InlineKeyboardButton('Повернутися до меню', callback_data='but-menu')
         )
-        text = 'Основні правила користуваня:' + '\n' + "1. Не спамити боту, у випадку спаму ваш акаунт буде заблокований." + '\n' + '2. Надсилати лише фото студентського квитка. Надсилати фото можна з будь якого ракурсу, головне, щоб фото мало достатнє освітлення' + '\n' + '3. Фото студентського квитка з додатку Дія не приймаються, бот буде видавати помилку' + '\n' + "4. Обов'язковою умовою скидання пароля є ідентичність ПІБ в документі та MS Teams, у випадку, якщо ПІБ не співпадає, зверніться до адміністратора для зміни ПІБ" + '\n' + '\n' + 'Конфіденційність наданої інформації:' + '\n' + '1. Надсилаючи дані боту, ви надаєте згоду на обробку персональних даних.' + '\n' + '1.1. До персональних даних належать: ПІБ, Telegram User ID, Telegram Username, дані студентського квитка, дані документів (номер та серія).' + '\n' + '2. Зберігання та використання даних:' + '\n' + '2.1. Дані зберігаються на внутрішньому сервері з закритим доступом лише для адміністраторів. Фото студентського квитка зберігаються на час обробки інформації, після обробки даних фото видаляється.' + '\n' + '2.2. Дані зміненого пароля зберігаються в базі з метою контролю роботи бота та не зберігають конфіденційної інформації (пароля). Зберігаються час скидання пароля, Telegram User ID, Telegram Username, логін для MS Teams та повідомлення про успіх/помилку скидання пароля.' + '\n' + "2.3. Дані надісланого повідомлення до адміністратора зберігаються з метою зворотнього звязку з користувачем, до даних, що зберігаються належать: час надсилання повідомлення, Telegram User ID, Telegram Username та текст повідомлення." + '\n' + '2.4. Право на використання збережених даних мають лише адміністратори MS Teams КТГГ та адміністратори Telegram бота.' + '\n' + '3. Доступ до даних можуть отримати посторонні особи лише при визначених обставинах: скарги на користувача (зміна пароля іншого користувача, образа адміністраторів та користувачів Telegram бота), дії, які блокують роботу бота.' + '\n' + '4. Логування запитів.' + '\n' + '4.1. Логування даних проводиться з метою контролю роботи бота та виявлення помилок роботи.' + '\n' + '4.2. До даних, які зберігаються належать: дії, які виконуть користувачі, час дії, Telegram User ID'
-        
+        text = 'Основні правила користуваня:' + '\n' + "1. Не спамити боту, у випадку спаму ваш акаунт буде заблокований." + '\n' + '2. Надсилати лише фото студентського квитка. Надсилати фото можна з будь якого ракурсу, головне, щоб фото мало достатнє освітлення' + '\n' + '3. Фото студентського квитка з додатку Дія не приймаються, бот буде видавати помилку' + '\n' + "4. Обов'язковою умовою скидання пароля є ідентичність ПІБ в документі та MS Teams, у випадку, якщо ПІБ не співпадає, зверніться до адміністратора для зміни ПІБ"
+
         bot.edit_message_text(text, call.message.chat.id, call.message.id, reply_markup=keyboard)
         
     elif call.data == "but-faq":
@@ -308,6 +251,7 @@ def callback_worker(call):
         text = "1. Я не можу зайти, моя пошта ...@gmail.com (ukr.net,...)" + "\n" + "Відповідь: кожному студенту створено обліковий запис типу ...@kdktgg.onmicrosoft.com або ...@ktgg.kiev.ua, тільки під цим записом ви можете користуватися MS Teams" + '\n' + "2. Пароль невірний, я ввожу той що мені дав куратор" + "\n" + "Відповідь: при першому вході в свій акаунт ВСІ змінюють пароль на будь-який свій, тому при подальшому вході потрібно використовувати саме його" + '\n' + "3. Я не бачу груп у себе" + "\n" + "Відповідь: уважно перевірте чи зайши ви під акаунтом, що вам надали, якщо ні, то перезайдіть, так - зверніться до адміністратора" + '\n' + "4. Я не бачу занять у календарі" + "\n" + "Відповідь: уважно перевірте чи зайши ви під акаунтом, що вам надали, якщо ні, то перезайдіть, якщо вас додали пізніше, то заняття створені раніше в календарі не відображаються, підключатися до них можна через 'Команди'" + '\n' + '5. У мене залишився розклад минулого року' + '\n' + 'Відповідь: ви можете його видалити через \'Календар\''
 
         bot.edit_message_text(text, call.message.chat.id, call.message.id, reply_markup=keyboard)
+
     elif call.data == "reset-pass":
         keyboard = telebot.types.InlineKeyboardMarkup()
         keyboard.row(
@@ -398,7 +342,7 @@ def callback_worker(call):
         teacher_base_reset.update({call.message.chat.id:{}})
         teacher_base_reset[call.message.chat.id].update({"id":1})
 
-        bot.send_message(call.message.chat.id, "Для верифікації відправте прізвище, ім\'я, по батькові та особовий ID. Наприклад: Антонов Антон Антонович 123456", reply_markup=keyboard)
+        bot.send_message(call.message.chat.id, "Для верифікації відправте особовий ID та прізвище, ім\'я, по батькові. Наприклад: 123456 Антонов Антон Антонович", reply_markup=keyboard)
 
     elif call.data == 'teacher-message':
         keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=1)
@@ -588,6 +532,9 @@ def reset_idcard(message):
     if message.chat.id in user_base_reset and user_base_reset[message.chat.id]:
         text = message.text.split()
         if len(text) == 4:
+            markup = types.ReplyKeyboardRemove(selective=False)
+            bot.send_message(message.chat.id, "Зачекайте, перевіряю дані", reply_markup=markup)
+
             check = changePass.resetPass_idcard(text[0], text[1], text[2], text[3])
             file = codecs.open("pass.txt", "a", 'utf-8')
 
@@ -879,4 +826,4 @@ while True:
         sleep(5)
     # print(1)
     
-
+# bot.infinity_polling(True)

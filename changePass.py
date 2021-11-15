@@ -301,7 +301,7 @@ def resetPass_idcard(ulastname = None, uname = None, uthirdname = None, uidcard 
 
 
 
-def resetPass_teacher(ulastname = None, uname = None, uthirdname = None, uid = None):
+def resetPass_teacher(uid = None, ulastname = None, uname = None, uthirdname = None):
     # generate password
 
     upper = string.ascii_uppercase
@@ -440,21 +440,22 @@ def nextcourse():
                 group_id = user_group.split("-")[1]
 
                 if user_group.split("-")[0].isdigit():
+                    
+                    user_group = group_id
+                    # group_number = int(user_group.split("-")[0])
+                    # if group_id == "ПТБД" or  group_id == "ОО" or  group_id == "ФБС" or  "РО" in group_id:
+                    #     if group_number > 30:
+                    #         user_group = group_id
+                    #     else:
+                    #         group_number += 10
+                    #         user_group = str(group_number) + '-' + group_id
 
-                    group_number = int(user_group.split("-")[0])
-                    if group_id == "ПТБД" or  group_id == "ОО" or  group_id == "ФБС" or  "РО" in group_id:
-                        if group_number > 30:
-                            user_group = group_id
-                        else:
-                            group_number += 10
-                            user_group = str(group_number) + '-' + group_id
+                    # elif group_number > 40:
+                    #     user_group = group_id
 
-                    elif group_number > 40:
-                        user_group = group_id
-
-                    else:
-                        group_number += 10
-                        user_group = str(group_number) + '-' + group_id
+                    # else:
+                    #     group_number += 10
+                    #     user_group = str(group_number) + '-' + group_id
             
             else:
                 print("Error")
