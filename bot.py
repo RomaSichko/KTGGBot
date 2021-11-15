@@ -2,7 +2,7 @@
 
 from threading import Timer
 from time import sleep, time
-from typing_extensions import runtime
+# from typing_extensions import runtime
 import telebot
 import changePass
 import os
@@ -40,6 +40,7 @@ def delete_contact(msg):
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    log = codecs.open("log.txt", "a", 'utf-8')
     keyboard = telebot.types.InlineKeyboardMarkup()
     keyboard.row(
         telebot.types.InlineKeyboardButton('Правила', callback_data='rules'),
@@ -52,7 +53,12 @@ def send_welcome(message):
     keyboard.row(
         telebot.types.InlineKeyboardButton('Написати адміністратору', callback_data='message-admin')
     )
+    keyboard.row(
+        telebot.types.InlineKeyboardButton('Адміністратори онлайн', callback_data='admin-online')
+     )
     bot.send_message(message.chat.id, "Привіт, я КТГГ-бот, допоможу Вам в роботі з MS Teams." + '\n' + "Оберіть потрібний пункт меню для продовження роботи",reply_markup = keyboard)
+    log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action:' + message.text + ' \n')
+    log.close()
 
 @bot.message_handler(commands=['menu'])
 def main_menu(message):
@@ -68,8 +74,15 @@ def main_menu(message):
     keyboard.row(
         telebot.types.InlineKeyboardButton('Написати адміністратору', callback_data='message-admin')
     )
+    keyboard.row(
+        telebot.types.InlineKeyboardButton('Адміністратори онлайн', callback_data='admin-online')
+     )
 
     bot.send_message(message.chat.id, "Оберіть подальшу дію", reply_markup=keyboard)
+
+    log = codecs.open("log.txt", "a", 'utf-8')
+    log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action:' + message.text + ' \n')
+    log.close()
 
 # @bot.message_handler(commands=['help'])
 # def help_command(message):
@@ -96,46 +109,54 @@ def main_menu(message):
 
 @bot.message_handler(content_types=['photo'])
 def photo(message):
-    markup = types.ReplyKeyboardRemove(selective=False)
+    global user_base_reset
+    if message.chat.id in user_base_reset and user_base_reset[message.chat.id] and user_base_reset[message.chat.id]["stud"]:
+        markup = types.ReplyKeyboardRemove(selective=False)
 
-    file = codecs.open("pass.txt", "a", 'utf-8')
+        file = codecs.open("pass.txt", "a", 'utf-8')
 
-    bot.send_message(message.chat.id, "Зачекайте деякий час. Перевіряю ваші дані", reply_markup=markup)
-    global img_id
+        bot.send_message(message.chat.id, "Зачекайте деякий час. Перевіряю ваші дані", reply_markup=markup)
+        global img_id
 
-    fileID = message.photo[-1].file_id
-    file_info = bot.get_file(fileID)
-    downloaded_file = bot.download_file(file_info.file_path)
+        fileID = message.photo[-1].file_id
+        file_info = bot.get_file(fileID)
+        downloaded_file = bot.download_file(file_info.file_path)
 
-    uphoto = "image" + str(message.chat.id) + ".jpg"
+        uphoto = "image" + str(message.chat.id) + ".jpg"
 
-    with open(uphoto, 'wb') as new_file:
-        new_file.write(downloaded_file)
-    check_true = changePass.resetPass("image" + str(message.chat.id) + ".jpg")
+        with open(uphoto, 'wb') as new_file:
+            new_file.write(downloaded_file)
+        check_true = changePass.resetPass("image" + str(message.chat.id) + ".jpg")
 
-    if check_true[0] == True:
-        bot.send_message(message.chat.id, "Дані знайдено. Генерую тимчасовий пароль")
-        msg = bot.send_message(message.chat.id,"Ваш логін: " + check_true[2] + "\n" + "Ваш тимчасовий пароль: " + check_true[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу")
+        if check_true[0] == True:
+            bot.send_message(message.chat.id, "Дані знайдено. Генерую тимчасовий пароль")
+            msg = bot.send_message(message.chat.id,"Ваш логін: " + check_true[2] + "\n" + "Ваш тимчасовий пароль: " + check_true[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу")
 
-        main_menu(msg)
+            main_menu(msg)
 
-        file.write(str(datetime.now()) + "\n" + "id: " + str(message.chat.id) + "\n" + "username: " + str(message.chat.username) + "\n" + "Ваш логін: " + check_true[2] + "\n" + "Ваш тимчасовий пароль: " + check_true[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу" + "\n" + "==========================" + "\n")
-    
+            file.write(str(datetime.now()) + "\n" + "id: " + str(message.chat.id) + "\n" + "username: " + str(message.chat.username) + "\n" + "Ваш логін: " + check_true[2] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу" + "\n" + "==========================" + "\n")
+        
+        else:
+            keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=1)
+            item = types.KeyboardButton("Відмінити")
+            keyboard.row(item)
+
+            bot.send_message(message.chat.id,"Вибачте, ваші дані в базі не знайдено, спробуйте відправити інше фото", reply_markup=keyboard)
+
+            file.write(str(datetime.now()) + "\n" + "id: " + str(message.chat.id) + "\n" + "username: " + str(message.chat.username) + "\n" + "Вибачте, ваші дані в базі не знайдено, спробуйте відправити інше фото" + "\n" + "==========================" + "\n")
+        
+        file.close()
+        try:
+            os.remove(uphoto)
+        except FileNotFoundError:
+            pass
+        img_id += 1
+
+        log = codecs.open("log.txt", "a", 'utf-8')
+        log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action: photo' + ' \n')
+        log.close()
     else:
-        keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=1)
-        item = types.KeyboardButton("Відмінити")
-        keyboard.row(item)
-
-        bot.send_message(message.chat.id,"Вибачте, ваші дані в базі не знайдено, спробуйте відправити інше фото", reply_markup=keyboard)
-
-        file.write(str(datetime.now()) + "\n" + "id: " + str(message.chat.id) + "\n" + "username: " + str(message.chat.username) + "\n" + "Вибачте, ваші дані в базі не знайдено, спробуйте відправити інше фото" + "\n" + "==========================" + "\n")
-    
-    file.close()
-    try:
-        os.remove(uphoto)
-    except FileNotFoundError:
-        pass
-    img_id += 1
+        bot.send_message(message.chat.id, "Невідома дія")
     
 # @bot.message_handler(commands=['resend_admin'])
 # def resend_message(message):
@@ -203,6 +224,10 @@ def admin_panel(message):
         bot.send_message(message.chat.id, "Оберіть дію", reply_markup=keyboard)
     else:
         bot.send_message(message.chat.id, "Введіть пароль")
+
+    log = codecs.open("log.txt", "a", 'utf-8')
+    log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action:' + message.text + ' \n')
+    log.close()
     
 @bot.message_handler(commands=['setstatus'])
 def status(message):
@@ -223,6 +248,10 @@ def status(message):
 
     with open('admin.json', 'w') as file:
         json.dump(base, file)
+
+    log = codecs.open("log.txt", "a", 'utf-8')
+    log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action:' + message.text + ' \n')
+    log.close()
 
 # @bot.message_handler(commands=['reset'])
 # def exchange_command(message):
@@ -304,6 +333,9 @@ def callback_worker(call):
         keyboard.row(
             telebot.types.InlineKeyboardButton('Написати адміністратору', callback_data='message-admin')
         )
+        keyboard.row(
+            telebot.types.InlineKeyboardButton('Адміністратори онлайн', callback_data='admin-online')
+        )
         text = "Оберіть потрібну дію:"
 
         bot.edit_message_text(text, call.message.chat.id, call.message.id, reply_markup=keyboard)
@@ -322,6 +354,24 @@ def callback_worker(call):
         # bot.edit_message_text("Відправте фото ДІЙСНОГО студентського квитка для отмимання тимчасового пароля", call.message.chat.id, call.message.id, reply_markup=keyboard)
         base_message.update({call.message.chat.id:{}})
         base_message[call.message.chat.id].update({"message":True})
+
+    elif call.data == 'admin-online':
+        base = json.load(codecs.open("admin.json", 'r', 'utf-8-sig'))
+        baseStatus = {'🔴':'зайнятий', '🟠': 'не активний', '🟡': 'на парі', '🟢': 'вільний'}
+        messageText = ''
+        for i in base:
+            if i['id'] == 684828985:
+                messageText += 'Рома Січко: ' + i['status'] + ' - ' + baseStatus[i['status']] + '\n'
+            if i['id'] == 461655305:
+                messageText += 'Богдана Сергієнко: ' + i['status'] + ' - ' + baseStatus[i['status']] + '\n'
+            if i['id'] == 365794368:
+                messageText += 'Нікіта Папірний: ' + i['status'] + ' - ' + baseStatus[i['status']] + '\n'
+
+        bot.delete_message(call.message.chat.id, call.message.id)
+        msg = bot.send_message(call.message.chat.id, messageText)
+
+
+        main_menu(msg)
 
 
     elif call.data == 'teacher':
@@ -427,6 +477,9 @@ def callback_worker(call):
             bot.send_message(call.message.chat.id, "Не верифіковано")
     # else: 
     #     bot.send_message(call.message.chat.id, "Не верифіковано")
+    log = codecs.open("log.txt", "a", 'utf-8')
+    log.write('[' + str(datetime.now()) + ']' + " ID: " + str(call.message.chat.id) + ' calldata: ' + call.data + ' \n')
+    log.close()
 
 @bot.message_handler(content_types=['text'])
 def reset_idcard(message):
@@ -536,11 +589,16 @@ def reset_idcard(message):
         text = message.text.split()
         if len(text) == 4:
             check = changePass.resetPass_idcard(text[0], text[1], text[2], text[3])
+            file = codecs.open("pass.txt", "a", 'utf-8')
 
             if check[0]:
                 markup = types.ReplyKeyboardRemove(selective=False)
                 bot.send_message(message.chat.id,"Дані знайдено." + '\n' + "Ваш логін: " + check[2] + "\n" + "Ваш тимчасовий пароль: " + check[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу", reply_markup=markup)
                 bot.send_message(message.chat.id, "Продовжити роботу", reply_markup=keyboard)
+                
+
+                file.write(str(datetime.now()) + "\n" + "id: " + str(message.chat.id) + "\n" + "username: " + str(message.chat.username) + "\n" + "Ваш логін: " + check[2] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу" + "\n" + "==========================" + "\n")
+
                 try:
                     del(user_base_reset[message.chat.id])
                 except KeyError:
@@ -553,6 +611,9 @@ def reset_idcard(message):
                 #     del(user_base_reset[message.chat.id])
                 # except KeyError:
                 #     pass
+                file.write(str(datetime.now()) + "\n" + "id: " + str(message.chat.id) + "\n" + "username: " + str(message.chat.username) + "\n" + "Вибачте, ваші дані в базі не знайдено" + "\n" + "==========================" + "\n")
+    
+        
             else:
                 markup = types.ReplyKeyboardRemove(selective=False)
 
@@ -563,6 +624,8 @@ def reset_idcard(message):
                     del(user_base_reset[message.chat.id])
                 except KeyError:
                     pass
+
+            file.close()
         
         else:
             bot.send_message(message.chat.id,"Невірно введені дані, спробуйте ще раз")
@@ -572,6 +635,7 @@ def reset_idcard(message):
             text = message.text.split()
             if len(text) == 4:
                 check = changePass.resetPass_teacher(text[0], text[1], text[2], text[3])
+                file = codecs.open("pass.txt", "a", 'utf-8')
 
                 if check[0]:
                     markup = types.ReplyKeyboardRemove(selective=False)
@@ -581,9 +645,15 @@ def reset_idcard(message):
                         del(teacher_base_reset[message.chat.id])
                     except KeyError:
                         pass
+
+                    file.write(str(datetime.now()) + "\n" + "id: " + str(message.chat.id) + "\n" + "username: " + str(message.chat.username) + "\n" + "Ваш логін: " + check[2] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу" + "\n" + "==========================" + "\n")
+
+
                 elif check[0] == False and check[1] != "":
 
                     bot.send_message(message.chat.id, check[1])
+                    file.write(str(datetime.now()) + "\n" + "id: " + str(message.chat.id) + "\n" + "username: " + str(message.chat.username) + "\n" + "Вибачте, ваші дані в базі не знайдено" + "\n" + "==========================" + "\n")
+
 
                 else:
                     markup = types.ReplyKeyboardRemove(selective=False)
@@ -594,6 +664,7 @@ def reset_idcard(message):
                         del(teacher_base_reset[message.chat.id])
                     except KeyError:
                         pass
+                file.close()
             else:
                 bot.send_message(message.chat.id,"Невірно введені дані, спробуйте ще раз")
 
@@ -619,18 +690,24 @@ def reset_idcard(message):
                     bot.send_message(message.chat.id,"Невірний пароль, верифікацію відмінено")   
             else:
                 if "id" in admin_base[message.chat.id] and admin_base[message.chat.id]["id"]:
-                    newpass = changePass.resetPass_bot(message.text)
+                    if '@ktgg.kiev.ua' in message.text or '@kdktgg.onmicrosoft.com' in message.text:
+                        newpass = changePass.resetPass_bot(message.text)
 
-                    bot.send_message(message.chat.id,"Логін: " + newpass[2] + "\n" + "Тимчасовий пароль: " + newpass[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу")
+                        bot.send_message(message.chat.id,"Логін: " + newpass[2] + "\n" + "Тимчасовий пароль: " + newpass[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу")
 
-                    
+                    else:
+                        bot.send_message(message.chat.id, "Невірно введені дані")
+
                     del(admin_base[message.chat.id]["id"])
 
                 elif "pib" in admin_base[message.chat.id] and admin_base[message.chat.id]["pib"]:
-                    newpass = changePass.resetPass_bot("0", message.text.split()[0],message.text.split()[1])
-                    
-                    bot.send_message(message.chat.id,"Логін: " + newpass[2] + "\n" + "Тимчасовий пароль: " + newpass[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу")
-
+                    text = message.text.split()
+                    if len(text) == 2:
+                        newpass = changePass.resetPass_bot("0", message.text.split()[0],message.text.split()[1])
+                        
+                        bot.send_message(message.chat.id,"Логін: " + newpass[2] + "\n" + "Тимчасовий пароль: " + newpass[1] + "\n" + "При вході змінюєте пароль на свій, який в подальшому буде використовуватися для входу")
+                    else:
+                        bot.send_message(message.chat.id, "Помилка введення")
                     
 
                     del(admin_base[message.chat.id]["pib"])
@@ -638,8 +715,19 @@ def reset_idcard(message):
                 elif "id-message" in admin_base[message.chat.id] and admin_base[message.chat.id]["id-message"]:
                     m = message.text.split()
 
-                    bot.send_message(int(m[0]),m[1:])
+                    if len(m) >= 2:
+
+                        if m[0].isdigit():
+                            bot.send_message(int(m[0]),m[1:])
+                            
+
+                        else:
+                            bot.send_message(message.chat.id, "Невірно введені дані")
+                    else:
+                        bot.send_message(message.chat.id, "Невірно введені дані")
+
                     del(admin_base[message.chat.id]["id-message"])
+                
 
                 elif "delete" in admin_base[message.chat.id] and admin_base[message.chat.id]["delete"]:
                     m = message.text.split()
@@ -769,8 +857,15 @@ def reset_idcard(message):
 
 
     else:
-        # bot.send_message(message.chat.id,"Невідома команда", reply_markup=keyboard)
-        pass
+        if message.chat.id == 684828985 or message.chat.id == 461655305 or message.chat.id == 365794368:
+            pass
+        else:
+            bot.send_message(message.chat.id,"Невідома дія")
+        
+
+    log = codecs.open("log.txt", "a", 'utf-8')
+    log.write('[' + str(datetime.now()) + ']' + " ID: " + str(message.chat.id) + ' action:' + message.text + ' \n')
+    log.close()
     
 
 
