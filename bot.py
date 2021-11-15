@@ -789,7 +789,7 @@ def reset_idcard(message):
 
     elif message.chat.id in admin_base:
             if admin_base[message.chat.id]["verify"] == False:
-                if message.text == "13367008@id":
+                if message.text == "":
                     admin_base[message.chat.id]["verify"] = True
                     bot.send_message(message.chat.id,"Верифікація успішна")
                     admin_panel(message)
