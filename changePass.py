@@ -10,6 +10,7 @@ import codecs
 import cv2
 from pyzbar.pyzbar import decode
 from O365 import Account
+import key
 
 
 # from bot_v2 import validMail
@@ -83,9 +84,9 @@ def get_username(img_name):
 
 # Functions
 def authenticate():
-    authority = ""
-    appID = ""
-    appSecret = ""
+    authority = key.get_siteToken()
+    appID = key.get_appID()
+    appSecret = key.get_appKey()
     scope = ["https://graph.microsoft.com/.default"]
 
     app = msal.ConfidentialClientApplication(
@@ -103,8 +104,6 @@ def authenticate():
 
     return result['access_token']
 
-
-# bot = telebot.TeleBot('1305496539:AAHKPM4qB9ONh6xwHoMzJCPiSxlynnPsp8Y')
 
 def resetPass(img_name):
     # generate password
@@ -266,6 +265,7 @@ def resetPass_idcard(ulastname=None, uname=None, uthirdname=None, uidcard=None):
     }
 
     uallname = ulastname + " " + uname + " " + uthirdname
+    uallname = uallname.lower()
     print(uallname)
 
     result = requests.get(
@@ -276,7 +276,10 @@ def resetPass_idcard(ulastname=None, uname=None, uthirdname=None, uidcard=None):
     user_name = ""
 
     for i in text_json:
-        name = i["Здобувач"]
+        name = i["Здобувач"].lower()
+        name = name.replace('`', '\'')
+
+        # print(name, uallname)
 
         if name == uallname:
             if i["Тип ДПО"] == "Паспорт громадянина України з безконтактним електронним носієм":
@@ -284,6 +287,7 @@ def resetPass_idcard(ulastname=None, uname=None, uthirdname=None, uidcard=None):
 
                 if uidcard == ucard:
                     user_name = uname + " " + ulastname
+    
 
     if user_name != "":
         user_id = ""
@@ -497,7 +501,7 @@ def nextcourse():
 
 def mailSend(toUserEmail, code):
 
-    userId = 'no-reply@ktgg.kiev.ua'
+    userId = key.get_replyMail()
     endpoint = f'https://graph.microsoft.com/v1.0/users/{userId}/sendMail'
 
     email_msg = {'Message': {'Subject': "Verify code KTGG Bot",

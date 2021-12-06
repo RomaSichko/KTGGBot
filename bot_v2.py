@@ -16,7 +16,7 @@ import json
 import smtplib
 import base_commands
 import re
-
+import key
  
 # Define a function for
 # for validating an Email
@@ -35,10 +35,10 @@ def validMail(email):
 
 
 # test bot
-bot = telebot.TeleBot("")
+bot = telebot.TeleBot(key.get_test_bot_api())
 
 # main bot
-# bot = telebot.TeleBot("")
+# bot = telebot.TeleBot(key.get_main_bot_api())
 
 global img_id
 img_id = 0
@@ -789,7 +789,7 @@ def reset_idcard(message):
 
     elif message.chat.id in admin_base:
             if admin_base[message.chat.id]["verify"] == False:
-                if message.text == " ":
+                if message.text == key.get_admin_key():
                     admin_base[message.chat.id]["verify"] = True
                     bot.send_message(message.chat.id,"Верифікація успішна")
                     admin_panel(message)
@@ -838,8 +838,12 @@ def reset_idcard(message):
                                     if i['status'] == False:
                                         # print("Yes")
 
-                                        bot.send_message(int(m[1]), "Відповідь адміністратора: " + '\n' + ' '.join(m[2:]))
-                                        msg = bot.send_message(message.chat.id, "Повідомлення надіслано")
+                                        if m[2].lower() == 'true':
+                                            msg = bot.send_message(message.chat.id, "Повідомлення відмічено")
+
+                                        else:
+                                            bot.send_message(int(m[1]), "Відповідь адміністратора: " + '\n' + ' '.join(m[2:]))
+                                            msg = bot.send_message(message.chat.id, "Повідомлення надіслано")
                                         admin_panel(msg)
 
                                         i['status'] = True

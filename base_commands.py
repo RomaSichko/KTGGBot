@@ -6,14 +6,15 @@ import requests
 from codecs import encode
 from json import JSONDecoder
 import changePass
+import key
 
 
 def sendRequest(payload):
-    url = ""
+    url = key.get_base_key()
 
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': ''
+        'Authorization': key.get_auth_base()
     }
 
     response = requests.request("POST", url, headers=headers, data=payload.encode('utf-8')).json()
@@ -76,3 +77,7 @@ def getUserData(telegramID):
 
     return userData
 
+    
+
+# telegramID, username, name, lastname, email, teams, position, validMail = 0, validTeams = 0, status = 1
+# ,\n\"name\": \"{name}\",\n\"lastname\": \"{lastname}\",\n\"email\": \"{email}\",\n\"teams\": \"{teams}\",\n        \"validMail\": {validMail},\n\"validTeams\": {validTeams}, \n\"status\": {status}, \n\"position\": \"{position}\"
