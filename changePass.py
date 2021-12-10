@@ -1,42 +1,50 @@
+import re
 from urllib.parse import urldefrag
 import requests
 import json
-import random, string
+import random
+import string
 import logging
 import msal
 import codecs
 import cv2
 from pyzbar.pyzbar import decode
+from O365 import Account
+import key
+
+
+# from bot_v2 import validMail
+
 
 def BarcodeReader(image):
-      
+
     # read the image in numpy array using cv2
     img = cv2.imread(image)
-       
+
     # Decode the barcode image
     try:
         detectedBarcodes = decode(img)
     except TypeError:
         return 0
-       
+
     # If not detected then print the message
     if not detectedBarcodes:
         return 0
     else:
-        
-          # Traveres through all the detected barcodes in image
-        for barcode in detectedBarcodes:  
-            
+
+        # Traveres through all the detected barcodes in image
+        for barcode in detectedBarcodes:
+
             # Locate the barcode position in image
             (x, y, w, h) = barcode.rect
-              
-            # Put the rectangle in image using 
+
+            # Put the rectangle in image using
             # cv2 to heighlight the barcode
             cv2.rectangle(img, (x-10, y-10),
-                          (x + w+10, y + h+10), 
+                          (x + w+10, y + h+10),
                           (255, 0, 0), 2)
-              
-            if barcode.data!="":
+
+            if barcode.data != "":
 
                 return barcode.data
             else:
@@ -55,18 +63,20 @@ def get_username(img_name):
     except ValueError:
         check_barcode = 0
     # check_barcode = int(shtrih_kod.BarcodeReader(img_name))
-
+    print(check_barcode)
     # check json
     if check_barcode:
         for i in text_json:
-            name = i["Здобувач"].split()
-            
-            name[0], name[1] = name[1], name[0]
-            stud_ticket = i["Студентський (учнівський) квиток"].split()[1]
-            # print(name, stud_ticket)
-            if stud_ticket == str(check_barcode):
-                user_name = " ".join(name[:2])
+            # name = i["Здобувач"].split()
+            # print(name)
 
+            # name[0], name[1] = name[1], name[0]
+            # print(name)
+            if i["Студентський (учнівський) квиток"] == "KB " + str(check_barcode):
+                name = i["Здобувач"].split()
+                user_name = name[1] + ' ' + name[0]
+
+    print(user_name)
     if user_name == "":
         return "error"
     else:
@@ -75,24 +85,26 @@ def get_username(img_name):
 
 # Functions
 def authenticate():
-    authority = "https://login.microsoftonline.com/kdktgg.onmicrosoft.com"
-    appID = "7c882179-7805-49ef-8e69-a98fe56d33d3"
-    appSecret = "pobMCR1174{*#^higsDJZK1"
+    authority = key.get_siteToken()
+    appID = key.get_appID()
+    appSecret = key.get_appKey()
     scope = ["https://graph.microsoft.com/.default"]
 
     app = msal.ConfidentialClientApplication(
-        appID, authority=authority, client_credential = appSecret)
+        appID, authority=authority, client_credential=appSecret)
 
     result = None
-    result = app.acquire_token_silent(["https://graph.microsoft.com/.default"], account=None)
+    result = app.acquire_token_silent(
+        ["https://graph.microsoft.com/.default"], account=None)
 
     if not result:
-        logging.info("No suitable token exists in cache. Let's get a new one from AAD.")
-        result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+        logging.info(
+            "No suitable token exists in cache. Let's get a new one from AAD.")
+        result = app.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/.default"])
 
     return result['access_token']
 
-# bot = telebot.TeleBot('1305496539:AAHKPM4qB9ONh6xwHoMzJCPiSxlynnPsp8Y')
 
 def resetPass(img_name):
     # generate password
@@ -108,30 +120,29 @@ def resetPass(img_name):
         password.append(random.choice(digits))
     strpass = ''.join(password)
 
-
     # graph
     headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + authenticate(),
-          }
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authenticate(),
+    }
 
     body = {
-                "passwordProfile": {
-                  "forceChangePasswordNextSignIn": True,
-                  "password": strpass
-                }
-            }
-
+        "passwordProfile": {
+            "forceChangePasswordNextSignIn": True,
+            "password": strpass
+        }
+    }
 
     # get user id
 
-    result = requests.get(f'https://graph.microsoft.com/beta/users/', headers = headers).json()
+    result = requests.get(
+        f'https://graph.microsoft.com/beta/users/', headers=headers).json()
 
     user_name = get_username(img_name)
     if user_name == 'error':
         print("error")
         return False, ""
-    
+
     user_id = ""
     while "@odata.nextLink" in result:
         i = 0
@@ -139,15 +150,17 @@ def resetPass(img_name):
         while len(result["value"]) != i:
             if user_name == result["value"][i]["displayName"]:
                 user_id = result["value"][i]["userPrincipalName"]
-            i += 1        
+            i += 1
 
-        result = requests.get(result["@odata.nextLink"], headers = headers).json()
+        result = requests.get(
+            result["@odata.nextLink"], headers=headers).json()
 
-    print(user_id)
+    print("ID:", user_id)
 
     # change pass
 
-    response = requests.patch(f'https://graph.microsoft.com/beta/users/{user_id}',headers = headers, data=json.dumps(body))
+    response = requests.patch(
+        f'https://graph.microsoft.com/beta/users/{user_id}', headers=headers, data=json.dumps(body))
 
     # result
 
@@ -162,7 +175,7 @@ def resetPass(img_name):
 
 
 # reset command
-def resetPass_bot(uid = None, uname = None, ulastname = None):
+def resetPass_bot(uid=None, uname=None, ulastname=None):
     # generate password
 
     upper = string.ascii_uppercase
@@ -176,21 +189,21 @@ def resetPass_bot(uid = None, uname = None, ulastname = None):
         password.append(random.choice(digits))
     strpass = ''.join(password)
 
-
     # graph
     headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + authenticate(),
-          }
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authenticate(),
+    }
 
     body = {
-                "passwordProfile": {
-                  "forceChangePasswordNextSignIn": True,
-                  "password": strpass
-                }
-            }
+        "passwordProfile": {
+            "forceChangePasswordNextSignIn": True,
+            "password": strpass
+        }
+    }
 
-    result = requests.get(f'https://graph.microsoft.com/beta/users/', headers = headers).json()
+    result = requests.get(
+        f'https://graph.microsoft.com/beta/users/', headers=headers).json()
 
     if uid == '0':
         user_id = ""
@@ -201,15 +214,16 @@ def resetPass_bot(uid = None, uname = None, ulastname = None):
             while len(result["value"]) != i:
                 if user_name == result["value"][i]["displayName"]:
                     user_id = result["value"][i]["userPrincipalName"]
-                i += 1        
+                i += 1
 
-            result = requests.get(result["@odata.nextLink"], headers = headers).json()
+            result = requests.get(
+                result["@odata.nextLink"], headers=headers).json()
 
     else:
         user_id = uid
 
-
-    response = requests.patch(f'https://graph.microsoft.com/beta/users/{user_id}',headers = headers, data=json.dumps(body))
+    response = requests.patch(
+        f'https://graph.microsoft.com/beta/users/{user_id}', headers=headers, data=json.dumps(body))
 
     # result
 
@@ -221,10 +235,10 @@ def resetPass_bot(uid = None, uname = None, ulastname = None):
         print(response.status_code)
         print(response.json())
         return False, "", ""
-    
+
 
 # reset command
-def resetPass_idcard(ulastname = None, uname = None, uthirdname = None, uidcard = None):
+def resetPass_idcard(ulastname=None, uname=None, uthirdname=None, uidcard=None):
     # generate password
 
     upper = string.ascii_uppercase
@@ -238,38 +252,43 @@ def resetPass_idcard(ulastname = None, uname = None, uthirdname = None, uidcard 
         password.append(random.choice(digits))
     strpass = ''.join(password)
 
-
     # graph
     headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + authenticate(),
-          }
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authenticate(),
+    }
 
     body = {
-                "passwordProfile": {
-                  "forceChangePasswordNextSignIn": True,
-                  "password": strpass
-                }
-            }
+        "passwordProfile": {
+            "forceChangePasswordNextSignIn": True,
+            "password": strpass
+        }
+    }
 
     uallname = ulastname + " " + uname + " " + uthirdname
+    uallname = uallname.lower()
     print(uallname)
 
-    result = requests.get(f'https://graph.microsoft.com/beta/users/', headers = headers).json()
+    result = requests.get(
+        f'https://graph.microsoft.com/beta/users/', headers=headers).json()
 
     text_json = json.load(codecs.open("students.json", 'r', 'utf-8-sig'))
 
     user_name = ""
 
     for i in text_json:
-        name = i["Здобувач"]
-        
+        name = i["Здобувач"].lower()
+        name = name.replace('`', '\'')
+
+        # print(name, uallname)
+
         if name == uallname:
             if i["Тип ДПО"] == "Паспорт громадянина України з безконтактним електронним носієм":
                 ucard = i["Номер документа"][-4:]
-                
+
                 if uidcard == ucard:
-                    user_name = uname + " " + ulastname 
+                    user_name = uname + " " + ulastname
+    
 
     if user_name != "":
         user_id = ""
@@ -278,13 +297,13 @@ def resetPass_idcard(ulastname = None, uname = None, uthirdname = None, uidcard 
             while len(result["value"]) != i:
                 if user_name == result["value"][i]["displayName"]:
                     user_id = result["value"][i]["userPrincipalName"]
-                i += 1        
+                i += 1
 
-            result = requests.get(result["@odata.nextLink"], headers = headers).json()
+            result = requests.get(
+                result["@odata.nextLink"], headers=headers).json()
 
-
-
-        response = requests.patch(f'https://graph.microsoft.com/beta/users/{user_id}',headers = headers, data=json.dumps(body))
+        response = requests.patch(
+            f'https://graph.microsoft.com/beta/users/{user_id}', headers=headers, data=json.dumps(body))
 
         # result
 
@@ -300,8 +319,7 @@ def resetPass_idcard(ulastname = None, uname = None, uthirdname = None, uidcard 
         return False, "Вибачте, ваші дані в базі не знайдено, перевірте правильність введення даних та відправте ще раз", ""
 
 
-
-def resetPass_teacher(ulastname = None, uname = None, uthirdname = None, uid = None):
+def resetPass_teacher(uid=None, ulastname=None, uname=None, uthirdname=None):
     # generate password
 
     upper = string.ascii_uppercase
@@ -315,24 +333,24 @@ def resetPass_teacher(ulastname = None, uname = None, uthirdname = None, uid = N
         password.append(random.choice(digits))
     strpass = ''.join(password)
 
-
     # graph
     headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + authenticate(),
-          }
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authenticate(),
+    }
 
     body = {
-                "passwordProfile": {
-                  "forceChangePasswordNextSignIn": True,
-                  "password": strpass
-                }
-            }
+        "passwordProfile": {
+            "forceChangePasswordNextSignIn": True,
+            "password": strpass
+        }
+    }
 
     uallname = ulastname + " " + uname + " " + uthirdname
     print(uallname)
 
-    result = requests.get(f'https://graph.microsoft.com/beta/users/', headers = headers).json()
+    result = requests.get(
+        f'https://graph.microsoft.com/beta/users/', headers=headers).json()
 
     text_json = json.load(codecs.open("teacher.json", 'r', 'utf-8-sig'))
 
@@ -340,10 +358,10 @@ def resetPass_teacher(ulastname = None, uname = None, uthirdname = None, uid = N
 
     for i in text_json:
         name = i["ПІБ"].lower()
-        
+
         if name == uallname.lower():
             if uid == i["ID працівника"]:
-                user_name = uname + " " + ulastname 
+                user_name = uname + " " + ulastname
 
     if user_name != "":
         user_id = ""
@@ -352,13 +370,13 @@ def resetPass_teacher(ulastname = None, uname = None, uthirdname = None, uid = N
             while len(result["value"]) != i:
                 if user_name == result["value"][i]["displayName"]:
                     user_id = result["value"][i]["userPrincipalName"]
-                i += 1        
+                i += 1
 
-            result = requests.get(result["@odata.nextLink"], headers = headers).json()
+            result = requests.get(
+                result["@odata.nextLink"], headers=headers).json()
 
-
-
-        response = requests.patch(f'https://graph.microsoft.com/beta/users/{user_id}',headers = headers, data=json.dumps(body))
+        response = requests.patch(
+            f'https://graph.microsoft.com/beta/users/{user_id}', headers=headers, data=json.dumps(body))
 
         # result
 
@@ -377,28 +395,29 @@ def resetPass_teacher(ulastname = None, uname = None, uthirdname = None, uid = N
 def detete_user(name, lastname):
     # graph
     headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + authenticate(),
-          }
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authenticate(),
+    }
 
-    result = requests.get(f'https://graph.microsoft.com/beta/users/', headers = headers).json()
+    result = requests.get(
+        f'https://graph.microsoft.com/beta/users/', headers=headers).json()
 
     user_name = name + ' ' + lastname
 
     user_id = ''
 
     while "@odata.nextLink" in result:
-            i = 0
-            while len(result["value"]) != i:
-                if user_name == result["value"][i]["displayName"]:
-                    user_id = result["value"][i]["userPrincipalName"]
-                i += 1        
+        i = 0
+        while len(result["value"]) != i:
+            if user_name == result["value"][i]["displayName"]:
+                user_id = result["value"][i]["userPrincipalName"]
+            i += 1
 
-            result = requests.get(result["@odata.nextLink"], headers = headers).json()
+        result = requests.get(
+            result["@odata.nextLink"], headers=headers).json()
 
-
-
-    response = requests.delete(f'https://graph.microsoft.com/beta/users/{user_id}',headers = headers)
+    response = requests.delete(
+        f'https://graph.microsoft.com/beta/users/{user_id}', headers=headers)
 
     # print(response)
 
@@ -411,22 +430,17 @@ def detete_user(name, lastname):
         return False, "", ""
 
 
-
 def nextcourse():
     headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + authenticate(),
-          }
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authenticate(),
+    }
 
-
-    
-
-    result = requests.get(f'https://graph.microsoft.com/beta/users/', headers = headers).json()
-
+    result = requests.get(
+        f'https://graph.microsoft.com/beta/users/', headers=headers).json()
 
     user_id = ''
     user_group = ''
-    
 
     while "@odata.nextLink" in result:
         i = 0
@@ -441,21 +455,22 @@ def nextcourse():
 
                 if user_group.split("-")[0].isdigit():
 
-                    group_number = int(user_group.split("-")[0])
-                    if group_id == "ПТБД" or  group_id == "ОО" or  group_id == "ФБС" or  "РО" in group_id:
-                        if group_number > 30:
-                            user_group = group_id
-                        else:
-                            group_number += 10
-                            user_group = str(group_number) + '-' + group_id
+                    user_group = group_id
+                    # group_number = int(user_group.split("-")[0])
+                    # if group_id == "ПТБД" or  group_id == "ОО" or  group_id == "ФБС" or  "РО" in group_id:
+                    #     if group_number > 30:
+                    #         user_group = group_id
+                    #     else:
+                    #         group_number += 10
+                    #         user_group = str(group_number) + '-' + group_id
 
-                    elif group_number > 40:
-                        user_group = group_id
+                    # elif group_number > 40:
+                    #     user_group = group_id
 
-                    else:
-                        group_number += 10
-                        user_group = str(group_number) + '-' + group_id
-            
+                    # else:
+                    #     group_number += 10
+                    #     user_group = str(group_number) + '-' + group_id
+
             else:
                 print("Error")
                 # continue
@@ -463,10 +478,11 @@ def nextcourse():
             print(user_group)
 
             body = {
-                    "jobTitle": user_group
-                }
+                "jobTitle": user_group
+            }
 
-            response = requests.patch(f'https://graph.microsoft.com/beta/users/{user_id}',headers = headers, data=json.dumps(body))
+            response = requests.patch(
+                f'https://graph.microsoft.com/beta/users/{user_id}', headers=headers, data=json.dumps(body))
 
             if str(response.status_code)[0] == '2':
                 print(f'Success! {response.status_code}')
@@ -480,7 +496,66 @@ def nextcourse():
             i += 1
             print("=======")
 
-        result = requests.get(result["@odata.nextLink"], headers = headers).json()
+        result = requests.get(
+            result["@odata.nextLink"], headers=headers).json()
 
+
+def mailSend(toUserEmail, code):
+
+    userId = key.get_replyMail()
+    endpoint = f'https://graph.microsoft.com/v1.0/users/{userId}/sendMail'
+
+    email_msg = {'Message': {'Subject': "Verify code KTGG Bot",
+                             'Body': {
+                                 'ContentType': 'Text',
+                                 'Content': "Ваш код підтвердження: %s. Нікому не розголошуйте його, якщо Ви не реєструєте акаунт в боті ігноруйте це повідомлення" % (code)},
+                             'ToRecipients': [{'EmailAddress': {'Address': toUserEmail}}]
+                             },
+                 'SaveToSentItems': 'true'}
+    r = requests.post(endpoint,
+                      headers={'Authorization': 'Bearer ' + authenticate()}, json=email_msg)
+    if r.ok:
+        print('Sent email successfully')
+    else:
+        print(r.json())
+
+
+def validTeams(userMail):
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authenticate(),
+    }
+
+    result = requests.get(
+        f'https://graph.microsoft.com/v1.0/users/{userMail}', headers=headers).json()
+
+    if 'error' in result:
+        return False
+    else:
+        return True
+
+def getUserData(userMail):
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authenticate(),
+    }
+
+    result = requests.get(
+        f'https://graph.microsoft.com/v1.0/users/{userMail}', headers=headers).json()
+
+    userData = [result['givenName'], result['surname']]
     
-# nextcourse()
+    if result['jobTitle'] != 'Викладач':
+        userData.append('Студент')
+    else:
+        userData.append('Викладач')
+
+    return userData
+    # https://graph.microsoft.com/v1.0/users/{user-mail}
+    # get user id
+
+
+# validTeams()
+# 
+
+# mailSend('romasichko1093@gmail.com')
