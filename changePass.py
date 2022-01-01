@@ -1,5 +1,4 @@
 import re
-from urllib.parse import urldefrag
 import requests
 import json
 import random
@@ -9,15 +8,22 @@ import msal
 import codecs
 import cv2
 from pyzbar.pyzbar import decode
-from O365 import Account
 import key
 
 
 # from bot_v2 import validMail
 
+def valid_mail(email):
+    regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
 
-def BarcodeReader(image):
+    if re.fullmatch(regex, email):
+        return True
 
+    else:
+        return False
+
+
+def barcode_reader(image):
     # read the image in numpy array using cv2
     img = cv2.imread(image)
 
@@ -40,8 +46,8 @@ def BarcodeReader(image):
 
             # Put the rectangle in image using
             # cv2 to heighlight the barcode
-            cv2.rectangle(img, (x-10, y-10),
-                          (x + w+10, y + h+10),
+            cv2.rectangle(img, (x - 10, y - 10),
+                          (x + w + 10, y + h + 10),
                           (255, 0, 0), 2)
 
             if barcode.data != "":
@@ -52,14 +58,11 @@ def BarcodeReader(image):
 
 
 def get_username(img_name):
-
     text_json = json.load(codecs.open("students.json", 'r', 'utf-8-sig'))
-
-    list_items = []
 
     user_name = ""
     try:
-        check_barcode = int(BarcodeReader(img_name))
+        check_barcode = int(barcode_reader(img_name))
     except ValueError:
         check_barcode = 0
     # check_barcode = int(shtrih_kod.BarcodeReader(img_name))
@@ -85,15 +88,13 @@ def get_username(img_name):
 
 # Functions
 def authenticate():
-    authority = key.get_siteToken()
-    appID = key.get_appID()
-    appSecret = key.get_appKey()
-    scope = ["https://graph.microsoft.com/.default"]
+    authority = key.get_site_token()
+    appID = key.get_app_id()
+    appSecret = key.get_app_key()
 
     app = msal.ConfidentialClientApplication(
         appID, authority=authority, client_credential=appSecret)
 
-    result = None
     result = app.acquire_token_silent(
         ["https://graph.microsoft.com/.default"], account=None)
 
@@ -106,14 +107,13 @@ def authenticate():
     return result['access_token']
 
 
-def resetPass(img_name):
+def reset_pass(img_name):
     # generate password
 
     upper = string.ascii_uppercase
     lower = string.ascii_lowercase
     digits = string.digits
-    password = []
-    password.append(random.choice(upper))
+    password = [random.choice(upper)]
     for i in range(2):
         password.append(random.choice(lower))
     for i in range(5):
@@ -136,7 +136,7 @@ def resetPass(img_name):
     # get user id
 
     result = requests.get(
-        f'https://graph.microsoft.com/beta/users/', headers=headers).json()
+        'https://graph.microsoft.com/beta/users/', headers=headers).json()
 
     user_name = get_username(img_name)
     if user_name == 'error':
@@ -175,14 +175,13 @@ def resetPass(img_name):
 
 
 # reset command
-def resetPass_bot(uid=None, uname=None, ulastname=None):
+def reset_pass_bot(uid=None, uname=None, ulastname=None):
     # generate password
 
     upper = string.ascii_uppercase
     lower = string.ascii_lowercase
     digits = string.digits
-    password = []
-    password.append(random.choice(upper))
+    password = [random.choice(upper)]
     for i in range(2):
         password.append(random.choice(lower))
     for i in range(5):
@@ -238,14 +237,13 @@ def resetPass_bot(uid=None, uname=None, ulastname=None):
 
 
 # reset command
-def resetPass_idcard(ulastname=None, uname=None, uthirdname=None, uidcard=None):
+def reset_pass_idcard(ulastname=None, uname=None, uthirdname=None, uidcard=None):
     # generate password
 
     upper = string.ascii_uppercase
     lower = string.ascii_lowercase
     digits = string.digits
-    password = []
-    password.append(random.choice(upper))
+    password = [random.choice(upper)]
     for i in range(2):
         password.append(random.choice(lower))
     for i in range(5):
@@ -288,7 +286,6 @@ def resetPass_idcard(ulastname=None, uname=None, uthirdname=None, uidcard=None):
 
                 if uidcard == ucard:
                     user_name = uname + " " + ulastname
-    
 
     if user_name != "":
         user_id = ""
@@ -319,14 +316,13 @@ def resetPass_idcard(ulastname=None, uname=None, uthirdname=None, uidcard=None):
         return False, "Вибачте, ваші дані в базі не знайдено, перевірте правильність введення даних та відправте ще раз", ""
 
 
-def resetPass_teacher(uid=None, ulastname=None, uname=None, uthirdname=None):
+def reset_pass_teacher(uid=None, ulastname=None, uname=None, uthirdname=None):
     # generate password
 
     upper = string.ascii_uppercase
     lower = string.ascii_lowercase
     digits = string.digits
-    password = []
-    password.append(random.choice(upper))
+    password = [random.choice(upper)]
     for i in range(2):
         password.append(random.choice(lower))
     for i in range(5):
@@ -439,9 +435,6 @@ def nextcourse():
     result = requests.get(
         f'https://graph.microsoft.com/beta/users/', headers=headers).json()
 
-    user_id = ''
-    user_group = ''
-
     while "@odata.nextLink" in result:
         i = 0
 
@@ -450,11 +443,10 @@ def nextcourse():
             user_group = result["value"][i]["jobTitle"]
             print(user_group)
 
-            if user_group != None and '-' in user_group:
+            if user_group is not None and '-' in user_group:
                 group_id = user_group.split("-")[1]
 
                 if user_group.split("-")[0].isdigit():
-
                     user_group = group_id
                     # group_number = int(user_group.split("-")[0])
                     # if group_id == "ПТБД" or  group_id == "ОО" or  group_id == "ФБС" or  "РО" in group_id:
@@ -500,16 +492,16 @@ def nextcourse():
             result["@odata.nextLink"], headers=headers).json()
 
 
-def mailSend(toUserEmail, code):
-
-    userId = key.get_replyMail()
+def mail_send(to_user_email, code):
+    userId = key.get_reply_mail()
     endpoint = f'https://graph.microsoft.com/v1.0/users/{userId}/sendMail'
 
     email_msg = {'Message': {'Subject': "Verify code KTGG Bot",
                              'Body': {
                                  'ContentType': 'Text',
-                                 'Content': "Ваш код підтвердження: %s. Нікому не розголошуйте його, якщо Ви не реєструєте акаунт в боті ігноруйте це повідомлення" % (code)},
-                             'ToRecipients': [{'EmailAddress': {'Address': toUserEmail}}]
+                                 'Content': "Ваш код підтвердження: %s. Нікому не розголошуйте його, якщо Ви не реєструєте акаунт в боті ігноруйте це повідомлення" % (
+                                     code)},
+                             'ToRecipients': [{'EmailAddress': {'Address': to_user_email}}]
                              },
                  'SaveToSentItems': 'true'}
     r = requests.post(endpoint,
@@ -520,31 +512,32 @@ def mailSend(toUserEmail, code):
         print(r.json())
 
 
-def validTeams(userMail):
+def valid_teams(user_mail):
     headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + authenticate(),
     }
 
     result = requests.get(
-        f'https://graph.microsoft.com/v1.0/users/{userMail}', headers=headers).json()
+        f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=headers).json()
 
     if 'error' in result:
         return False
     else:
         return True
 
-def getUserData(userMail):
+
+def get_user_data(user_mail):
     headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + authenticate(),
     }
 
     result = requests.get(
-        f'https://graph.microsoft.com/v1.0/users/{userMail}', headers=headers).json()
+        f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=headers).json()
 
     userData = [result['givenName'], result['surname']]
-    
+
     if result['jobTitle'] != 'Викладач':
         userData.append('Студент')
     else:
@@ -553,7 +546,6 @@ def getUserData(userMail):
     return userData
     # https://graph.microsoft.com/v1.0/users/{user-mail}
     # get user id
-
 
 # validTeams()
 # 
