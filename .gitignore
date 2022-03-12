@@ -112,3 +112,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# files
+admin.json
+black_list.json
+key.py
+log.txt
+picture_generator.py
+students.json
+teacher.json
+message.json
