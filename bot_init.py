@@ -8,61 +8,71 @@ from telebot import types
 import json
 import base_commands
 import key
-from constants import ConstantMessages, Keypads
+from KTGGBot.constants.dbs import TestDbs, MainDbs
+from KTGGBot.constants.keypads import Keypads
+from KTGGBot.constants.messages import MessagesText
 
 
 class KTGGFunctions:
 
     def __init__(self, bot: telebot.TeleBot):
         self.bot = bot
+        self.actions = {}
+        self.db_user = base_commands.DbExecutor()
+        self.db_user.db_type = TestDbs if base_commands.DbExecutor.current_db == "test" else MainDbs
 
-        self.user_base_reset = {}
-        self.teacher_base_reset = {}
-        self.base_message = {}
-        self.teacher_message = {}
-        self.teacher_call = {}
-        self.admin_base = {}
         self.mainIDMessage = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))[-1]['mainIDMessage'] + 1
-        self.mailAuth = {}
-        self.teamsAuth = {}
-        self.lastnameNameAuth = {}
 
     def welcome(self, message):
+        self.delete_user_last_message(message=message)
         self.bot.send_message(
             chat_id=message.chat.id,
-            text=ConstantMessages.START_MESSAGE,
+            text=MessagesText.WELCOME,
             reply_markup=Keypads.MAIN_MENU,
         )
 
     def main_menu(self, message):
+        self.actions.update({message.chat.id: {"main_menu_action": None}})
+        self.delete_user_last_message(message=message)
         self.bot.send_message(
             chat_id=message.chat.id,
-            text=ConstantMessages.NEXT_ACTION,
+            text=MessagesText.MENU_MESSAGES,
             reply_markup=Keypads.MAIN_MENU,
         )
 
     def my_account(self, message):
-        check = base_commands.check_user_in_base(message.chat.id)
+        self.delete_user_last_message(message=message)
+        check = self.db_user.check_user_in_base(message.chat.id)
 
-        temp_keypad = Keypads.ACCOUNT_MENU
         if check:
-            if base_commands.get_valid_teams(message.chat.id):
-                temp_keypad.row(
-                    telebot.types.InlineKeyboardButton('Скинути пароль', callback_data='acc-password')
-                )
+            mail_exist = self.db_user.get_valid_mail(message.chat.id)
+            teams_mail_exist = self.db_user.get_valid_teams(message.chat.id)
+
+            if mail_exist and teams_mail_exist:
+                keypad = Keypads.ACCOUNT_MENU_FULL
+            elif teams_mail_exist:
+                keypad = Keypads.ACCOUNT_MENU_WITH_TEAMS
+            elif mail_exist:
+                keypad = Keypads.ACCOUNT_MENU_WITH_MAIL
+            else:
+                keypad = Keypads.ACCOUNT_MENU_NEW_ACCOUNT
 
         else:
-            base_commands.add_data(message.chat.id, message.chat.username)
+            keypad = Keypads.ACCOUNT_MENU_NEW_ACCOUNT
+            self.db_user.add_data(
+                telegram_id=message.chat.id,
+                username=message.chat.username
+            )
             self.bot.send_message(
                 chat_id=message.chat.id,
-                text=ConstantMessages.ACCOUNT_DATA_TO_DB,
+                text=MessagesText.ADDED_ACCOUNT_IN_DB,
             )
 
-        user_data_in_db = base_commands.get_user_data(message.chat.id)
+        user_data_in_db = self.db_user.get_user_data(message.chat.id)
         self.bot.send_message(
             chat_id=message.chat.id,
             text=user_data_in_db,
-            reply_markup=temp_keypad,
+            reply_markup=keypad,
         )
 
     def action_photo(self, message):
@@ -139,7 +149,7 @@ class KTGGFunctions:
             self.bot.send_message(
                 chat_id=message.chat.id,
                 text=ConstantMessages.ACTION,
-                reply_markup=Keypads.ADMIN_MENU,
+                reply_markup=Keypads.ADMIN_MAIN_MENU,
             )
         else:
             self.bot.send_message(
@@ -163,32 +173,59 @@ class KTGGFunctions:
             json.dump(base, file)
 
     def callback_worker(self, call):
-        # Main menu
-        calls = {
-            "get-stud": CallHandler.get_student_ticket,
-            "get-idcard": CallHandler.get_id_card,
-            "rules": CallHandler.show_rules,
-            "but-faq": CallHandler.show_faq,
-            "reset-pass": CallHandler.choice_verify_type,
-            "but-menu": CallHandler.show_menu,
-            "message-admin": CallHandler.message_to_admin,
-            "acc-mail": CallHandler.get_email,
-            "acc-teams": CallHandler.get_teams_account,
-            "acc-lastname": CallHandler.get_lastname,
-            "acc-name": CallHandler.get_name,
-            "acc-password": CallHandler.change_password_account,
-            "admin-online": CallHandler.show_admin_online,
-            "teacher": CallHandler.show_teacher_menu,
-            "teacher-reset": CallHandler.get_teacher_verify_reset,
-            "teacher-message": CallHandler.get_teacher_verify_message,
-            "teacher-call": CallHandler.get_teacher_verify_call,
-            "admin-quit": CallHandler.admin_quit,
-            "admin-id": CallHandler.admin_reset_id,
-            "admin-pib": CallHandler.admin_reset_pib,
-            "admin-send": CallHandler.admin_send_message,
-            "admin-delete": CallHandler.admin_delete_account,
-            "admin-kill": CallHandler.admin_black_list,
+        self.call = call
+        print(self.actions)
+        new_calls = {
+            "main-rules": self.main_rules_show,
+            "main-faq": self.main_faq_show,
+            "reset-password-without-account": self.reset_password_choice_verify_type,
+            "show-admin-online": self.admins_online_show,
+            "message-to-admin": self.message_to_admin_call,
+            "back-main-menu": self.back_to_main_menu,
+            "verify-student-ticket": self.verify_type_student_ticket,
+            "verify-id-card": self.verify_type_id_card,
+            "edit-email-account": self.edit_email_personal_account,
+            "edit-teams-account": self.edit_teams_personal_account,
+            "reset-password-account": self.reset_password_account,
+            "message-to-admin-account": self.message_to_admin_account,
+            "add-email-account": self.add_email_personal_account,
+            "add-teams-account": self.add_teams_personal_account,
+            "edit-email-account-work": self.edit_email_work_account,
+            "edit-teams-account-work": self.edit_teams_work_account,
+            "edit-data-account-work": self.edit_data_work_account,
+            "message-teams-to-admin-work": self.message_to_admin_work_account,
+            "message-other-to-admin-work": self.message_other_to_admin_work_account,
+            "add-email-account-work": self.add_email_work_account,
+            "add-teams-account-work": self.add_teams_work_account,
+            # "admin-reset-pass-id"
+            # "admin-reset-pass-pib"
+            # "admin-send-message"
+            # "admin-change-status"
+            # "admin-black-list"
+            # "admin-logout"
+            # "admin-tasks-list"
+            # "admin-tasks-status"
+            # "admin-worker-edit"
+            # "admin-tasks-questions"
+            # "admin-logout"
+            # "admin-delete-account"
+            # "admin-add-edbo-account"
+            # "admin-new-groups"
+            # "admin-new-year"
+            # "admin-logout"
+            # "admin-black-list-add"
+            # "admin-black-list-remove"
+            # "admin-back-main-menu"
+            # "task-status-new"
+            # "task-status-stoped"
+            # "task-status-in-progress"
+            # "task-status-done"
+            # "task-executor-1"
+            # "task-executor-2"
+            # "task-executor-3"
+            # "task-executor-4"
         }
+        new_calls[call.data]()
 
     def text_handler(self, message):
 
@@ -795,16 +832,161 @@ class KTGGFunctions:
         with open("message.json", "w") as outfile:
             json.dump(black_list, outfile)
 
+    def delete_user_last_message(self, message):
+        self.bot.delete_message(
+            chat_id=message.chat.id,
+            message_id=message.id,
+        )
 
-class MessageHandler(KTGGFunctions):
-    pass
+    def main_rules_show(self):
+        self._edit_message(
+            text=MessagesText.MAIN_RULES,
+            reply_markup=Keypads.BACK_TO_MAIN_MENU,
+        )
+
+    def main_faq_show(self):
+        self._edit_message(
+            text=MessagesText.MAIN_FAQ,
+            reply_markup=Keypads.BACK_TO_MAIN_MENU,
+        )
+
+    def reset_password_choice_verify_type(self):
+        self._edit_message(
+            text=MessagesText.RESET_PASSWORD_WITHOUT_ACC_CHOICE_VERIFY_TYPE,
+            reply_markup=Keypads.TYPE_OF_RESET,
+        )
+
+    def admins_online_show(self):
+        admin_status_template = "\t{name} {status}\n"
+        message_text = "Статуси:\n\t🔴 - зайнятий\n\t🟠 - не активний\n\t🟡 - на парі\n\t🟢 - вільний\nАдміни:\n"
+
+        for admin in json.load(codecs.open("admin.json", 'r', 'utf-8-sig')):
+            message_text += admin_status_template.format(
+                name=admin["name"],
+                status=admin["status"],
+            )
+
+        self._edit_message(
+            text=message_text,
+            reply_markup=Keypads.BACK_TO_MAIN_MENU,
+        )
+
+    def message_to_admin_call(self):
+        self._remove_old_message_send_message(
+            text=MessagesText.MESSAGE_TO_ADMIN,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def back_to_main_menu(self):
+        self._edit_message(
+            text=MessagesText.MENU_MESSAGES,
+            reply_markup=Keypads.MAIN_MENU,
+        )
+
+    def verify_type_student_ticket(self):
+        self._remove_old_message_send_message(
+            text=MessagesText.MESSAGE_STUDENT_TICKET_RESET_TYPE,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def verify_type_id_card(self):
+        self._remove_old_message_send_message(
+            text=MessagesText.MESSAGE_ID_CARD_RESET_TYPE,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def edit_email_personal_account(self):
+        self.edit_email_account()
+
+    def edit_teams_personal_account(self):
+        self.edit_teams_account()
+
+    def edit_email_work_account(self):
+        self.edit_email_account()
+
+    def edit_teams_work_account(self):
+        self.edit_teams_account()
+
+    def add_email_personal_account(self):
+        self.add_email_account()
+
+    def add_teams_personal_account(self):
+        self.add_teams_account()
+
+    def add_email_work_account(self):
+        self.add_email_account()
+
+    def add_teams_work_account(self):
+        self.add_teams_account()
+
+    def message_to_admin_account(self):
+        self.message_to_admin_call()
+
+    def message_to_admin_work_account(self):
+        self.message_to_admin_call()
+
+    def message_other_to_admin_work_account(self):
+        self._remove_old_message_send_message(
+            text=MessagesText.MESSAGE_TO_ADMIN_NO_TEAMS,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def reset_password_account(self):
+        self._edit_message(
+            text=MessagesText.MESSAGE_RESET_PASSWORD_ACCOUNT,
+            reply_markup=Keypads.REMOVE,
+        )
+
+    def edit_data_work_account(self):
+        self._remove_old_message_send_message(
+            text=MessagesText.MESSAGE_EDIT_DATA_ACCOUNT,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def add_email_account(self):
+        self._remove_old_message_send_message(
+            text=MessagesText.MESSAGE_ADD_EMAIL_ACCOUNT,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def add_teams_account(self):
+        self._remove_old_message_send_message(
+            text=MessagesText.MESSAGE_ADD_TEAMS_ACCOUNT,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def edit_email_account(self):
+        self._remove_old_message_send_message(
+            text=MessagesText.MESSAGE_EDIT_EMAIL_ACCOUNT,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def edit_teams_account(self):
+        self._remove_old_message_send_message(
+            text=MessagesText.MESSAGE_EDIT_TEAMS_ACCOUNT,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def _edit_message(self, text: str, reply_markup: telebot.REPLY_MARKUP_TYPES):
+        self.bot.edit_message_text(
+            message_id=self.call.message.id,
+            chat_id=self.call.message.chat.id,
+            text=text,
+            reply_markup=reply_markup,
+        )
+        self.db_user.update_user_action(self.call.message.chat.id, self.call.data)
+
+    def _remove_old_message_send_message(self, text: str, reply_markup: telebot.REPLY_MARKUP_TYPES):
+        self.delete_user_last_message(message=self.call.message)
+        self.bot.send_message(
+            chat_id=self.call.message.chat.id,
+            text=text,
+            reply_markup=reply_markup,
+        )
+        self.db_user.update_user_action(self.call.message.chat.id, self.call.data)
 
 
-class CallHandler(KTGGFunctions):
 
-    def __init__(self, call, bot: telebot.TeleBot):
-        super().__init__(bot)
-        self.call = call
 
     def get_student_ticket(self):
         self.bot.send_message(

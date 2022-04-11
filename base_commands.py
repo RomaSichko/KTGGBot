@@ -1,93 +1,159 @@
 # -*- coding: utf-8 -*-
-from typing import Any
+import datetime
+from typing import Any, Type
 
 import requests
 
 import changePass
 import key
+from KTGGBot.constants.dbs import MainDbs, Dbs
+
+db_schema = {
+    "id": "auto",
+    "email": str,
+    "teamsMail": str,
+    "telegramID": int,
+    "telegramNickname": str,
+    "userName": str,
+    "userRole": str,
+    "validMail": bool,
+    "validTeams": bool,
+    "memeees": bool,
+}
+
+db_test_name = "base.accounts"
+# db_name = "base.user_acc"
 
 
-def send_request(payload) -> Any:
-    """Send POST request with custom payload"""
-    url = key.get_base_key()
+class DbExecutor:
+    sql_template = "\n    \"operation\": \"sql\",\n    \"sql\": \"{sql_request}\"\n"
+    db_type = None
 
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': key.get_auth_base()
-    }
+    def send_request(self, payload: str) -> Any:
+        """Send POST request with custom payload"""
+        url = key.get_base_key()
 
-    response = requests.request("POST", url, headers=headers, data=payload.encode('utf-8')).json()
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': key.get_auth_base()
+        }
 
-    return response
+        payload = "{" + payload + "}"
 
+        response = requests.request("POST", url, headers=headers, data=payload.encode('utf-8')).json()
 
-def add_data(telegram_id: int, username: str) -> None:
-    """Add user telegram_id and username to db"""
-    payload = "{\n\"operation\": \"insert\",\n\"schema\": \"base\",\n\"table\": \"accounts\",\n\"records\": [\n{ " + \
-              f"\n\"id\": {telegram_id},\n\"telegramID\": {telegram_id},\n\"username\": \"{username}\"" + "}\n    ]\n}"
+        print(f"{datetime.datetime.now()}: db work, payload \n{payload} \nresponse: {response}")
+        return response
 
-    send_request(payload)
+    @property
+    def current_db(self):
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM {Dbs.system} WHERE parameter = \'db\'",
+        )
+        response = self.send_request(payload)
 
+        return response[0]["value"]
 
-def update_data_name(telegram_id: int, name: str) -> None:
-    """Update user name in db"""
-    payload = "{" + f"\n    \"operation\": \"sql\",\n    \"sql\": \"UPDATE base.accounts SET name = \'{name}\' WHERE id = {telegram_id}\"\n" + "}"
-    send_request(payload)
+    def update_user_action(self, telegram_id: int, action: str):
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM base.test_user_actions WHERE telegramID = {telegram_id}",
+        )
+        response = self.send_request(payload)
 
+        if not response:
+            payload = self.sql_template.format(
+                sql_request=f"INSERT INTO base.test_user_actions (telegramID, action) VALUE ({telegram_id}, \'{action}\')",
+            )
+        else:
+            payload = self.sql_template.format(
+                sql_request=f"UPDATE base.test_user_actions SET action = \'{action}\' WHERE telegramID = {telegram_id}",
+            )
 
-def update_data_lastname(telegram_id: int, lastname: str) -> None:
-    """Update user lastname in db"""
-    payload = "{" + f"\n    \"operation\": \"sql\",\n    \"sql\": \"UPDATE base.accounts SET lastname = \'{lastname}\' WHERE id = {telegram_id}\"\n" + "}"
-    send_request(payload)
-
-
-def update_data_mail(telegram_id: int, mail: str) -> None:
-    """Update user email in db"""
-    payload = "{" + f"\n    \"operation\": \"sql\",\n    \"sql\": \"UPDATE base.accounts SET email = \'{mail}\', validMail = true WHERE id = {telegram_id}\"\n" + "}"
-    send_request(payload)
-
-
-def update_data_teams(telegram_id: int, mail: str) -> None:
-    """Update user teams login in db"""
-    data = changePass.get_user_data(mail)
-    payload = "{" + f"\n    \"operation\": \"sql\",\n    \"sql\": \"UPDATE base.accounts SET teams = \'{mail}\', validTeams = true, position = \'{data[2]}\', name = \'{data[0]}\', lastname = \'{data[1]}\' WHERE id = {telegram_id}\"\n" + "}"
-    send_request(payload)
-
-
-def check_user_in_base(telegram_id: int) -> bool:
-    """Check is user in db"""
-    payload = "{" + f"\n    \"operation\": \"sql\",\n    \"sql\": \"SELECT * FROM base.accounts WHERE id = {telegram_id}\"\n" + "}"
-    checker = send_request(payload)
-
-    if len(checker) != 0:
-        return True
-
-    return False
+        return self.send_request(payload)
 
 
-def get_valid_teams(telegram_id: int) -> bool:
-    """Get user valid_teams status from db"""
-    payload = "{" + f"\n    \"operation\": \"sql\",\n    \"sql\": \"SELECT validTeams FROM base.accounts WHERE id = {telegram_id}\"\n" + "}"
-    checker = send_request(payload)
+    def add_data(self, telegram_id: int, username: str) -> None:
+        """Add user telegram_id and username to db"""
+        payload = self.sql_template.format(
+            sql_request=f"INSERT INTO {self.db_name} (telegramID, telegramNickname) VALUE ({telegram_id}, \'{username}\')",
+        )
 
-    return checker[0]['validTeams']
+        return self.send_request(payload)
 
+    def update_data_name(self, telegram_id: int, name: str) -> None:
+        """Update user name in db"""
+        payload = self.sql_template.format(
+            sql_request=f"UPDATE {self.db_name} SET userName = \'{name}\' WHERE telegramID = {telegram_id}",
+        )
 
-def get_teams(telegram_id: int) -> str:
-    """Get user teams login from db"""
-    payload = "{" + f"\n    \"operation\": \"sql\",\n    \"sql\": \"SELECT teams FROM base.accounts WHERE id = {telegram_id}\"\n" + "}"
-    checker = send_request(payload)
+        return self.send_request(payload)
 
-    return checker[0]['teams']
+    def update_data_mail(self, telegram_id: int, mail: str) -> None:
+        """Update user email in db"""
+        payload = self.sql_template.format(
+            sql_request=f"UPDATE {self.db_name} SET email = \'{mail}\', validMail = true WHERE telegramID = {telegram_id}",
+        )
 
+        return self.send_request(payload)
 
-def get_user_data(telegram_id: int) -> str:
-    """Get all user data from db"""
-    payload = "{" + f"\n    \"operation\": \"sql\",\n    \"sql\": \"SELECT * FROM base.accounts WHERE id = {telegram_id}\"\n" + "}"
-    checker = send_request(payload)
+    def update_data_teams(self, telegram_id: int, mail: str) -> None:
+        """Update user teams login in db"""
+        data = changePass.get_user_data(mail)
+        user_name = f"{data[0]} {data[1]}"
+        payload = self.sql_template.format(
+            sql_request=f"UPDATE {self.db_name} SET teamsMail = \'{mail}\', validTeams = true, userRole = \'{data[2]}\', userName = \'{user_name}\' WHERE telegramID = {telegram_id}",
+        )
 
-    user_data = (f"Ваші дані \n Електронна пошта: {str(checker[0]['email'])} Прізвище: "
-                 f"{str(checker[0]['lastname'])} \nІм\'я: {str(checker[0]['name'])} MS Teams: "
-                 f"{str(checker[0]['teams'])} \nПосада: {str(checker[0]['position'])}")
+        return self.send_request(payload)
 
-    return user_data
+    def check_user_in_base(self, telegram_id: int) -> bool:
+        """Check is user in db"""
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM {self.db_name} WHERE telegramID = {telegram_id}",
+        )
+        result = self.send_request(payload)
+
+        return bool(result)
+
+    def get_valid_teams(self, telegram_id: int) -> bool:
+        """Get user valid_teams status from db"""
+        payload = self.sql_template.format(
+            sql_request=f"SELECT validTeams FROM {self.db_name} WHERE telegramID = {telegram_id}",
+        )
+        result = self.send_request(payload)
+
+        return bool(result[0]['validTeams'])
+
+    def get_valid_mail(self, telegram_id: int) -> bool:
+        """Get user valid_teams status from db"""
+        payload = self.sql_template.format(
+            sql_request=f"SELECT validMail FROM {self.db_name} WHERE telegramID = {telegram_id}",
+        )
+        result = self.send_request(payload)
+
+        return bool(result[0]['validMail'])
+
+    def get_teams(self, telegram_id: int) -> str:
+        """Get user teams login from db"""
+        payload = self.sql_template.format(
+            sql_request=f"SELECT teamsMail FROM {self.db_name} WHERE telegramID = {telegram_id}",
+        )
+        result = self.send_request(payload)
+
+        return result[0]['teamsMail']
+
+    def get_user_data(self, telegram_id: int) -> str:
+        """Get all user data from db"""
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM {self.db_name} WHERE telegramID = {telegram_id}",
+        )
+        result = self.send_request(payload)[0]
+        user_data = "Ваші дані \nEmail: {email} \nІм\'я та прізвище: {name} \nTeams email: {teams} \nПосада: {status}"
+        user_data = user_data.format(
+            email=result["email"],
+            name=result["userName"],
+            teams=result["teamsMail"],
+            status=result["userRole"],
+        )
+
+        return user_data

@@ -536,14 +536,14 @@ def get_user_data(user_mail):
     result = requests.get(
         f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=headers).json()
 
-    userData = [result['givenName'], result['surname']]
+    user_data = [result['givenName'], result['surname']]
 
     if result['jobTitle'] != 'Викладач':
-        userData.append('Студент')
+        user_data.append('Студент')
     else:
-        userData.append('Викладач')
+        user_data.append('Викладач')
 
-    return userData
+    return user_data
     # https://graph.microsoft.com/v1.0/users/{user-mail}
     # get user id
 
