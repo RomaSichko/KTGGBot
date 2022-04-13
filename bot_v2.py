@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from random import randint
 import telebot
 import key
 from bot_init import KTGGFunctions
@@ -52,10 +51,8 @@ def admin_panel_danger(message):
 
 
 @bot.message_handler(commands=['switch'])
-def admin_panel_danger(message):
-    # TODO: switch to test db, test user, pwd
-    ...
-    # ktgg_bot.admin_panel(message)
+def switch_dbs(message):
+    ktgg_bot.switch_db(message)
 
 
 @bot.callback_query_handler(func=lambda call: True)

@@ -21,13 +21,10 @@ db_schema = {
     "memeees": bool,
 }
 
-db_test_name = "base.accounts"
-# db_name = "base.user_acc"
-
 
 class DbExecutor:
     sql_template = "\n    \"operation\": \"sql\",\n    \"sql\": \"{sql_request}\"\n"
-    db_type = None
+    db_type: MainDbs = None
 
     def send_request(self, payload: str) -> Any:
         """Send POST request with custom payload"""
@@ -45,7 +42,6 @@ class DbExecutor:
         print(f"{datetime.datetime.now()}: db work, payload \n{payload} \nresponse: {response}")
         return response
 
-    @property
     def current_db(self):
         payload = self.sql_template.format(
             sql_request=f"SELECT * FROM {Dbs.system} WHERE parameter = \'db\'",
@@ -54,28 +50,34 @@ class DbExecutor:
 
         return response[0]["value"]
 
+    def switch_db(self, new_db):
+        payload = self.sql_template.format(
+            sql_request=f"UPDATE {Dbs.system} SET `value` = \'{new_db}\' WHERE parameter = \'db\'"
+        )
+
+        self.send_request(payload)
+
     def update_user_action(self, telegram_id: int, action: str):
         payload = self.sql_template.format(
-            sql_request=f"SELECT * FROM base.test_user_actions WHERE telegramID = {telegram_id}",
+            sql_request=f"SELECT * FROM {self.db_type.user_actions} WHERE telegramID = {telegram_id}",
         )
         response = self.send_request(payload)
 
         if not response:
             payload = self.sql_template.format(
-                sql_request=f"INSERT INTO base.test_user_actions (telegramID, action) VALUE ({telegram_id}, \'{action}\')",
+                sql_request=f"INSERT INTO {self.db_type.user_actions} (telegramID, action) VALUE ({telegram_id}, \'{action}\')",
             )
         else:
             payload = self.sql_template.format(
-                sql_request=f"UPDATE base.test_user_actions SET action = \'{action}\' WHERE telegramID = {telegram_id}",
+                sql_request=f"UPDATE {self.db_type.user_actions} SET action = \'{action}\' WHERE telegramID = {telegram_id}",
             )
 
         return self.send_request(payload)
 
-
     def add_data(self, telegram_id: int, username: str) -> None:
         """Add user telegram_id and username to db"""
         payload = self.sql_template.format(
-            sql_request=f"INSERT INTO {self.db_name} (telegramID, telegramNickname) VALUE ({telegram_id}, \'{username}\')",
+            sql_request=f"INSERT INTO {self.db_type.user_accounts} (telegramID, telegramNickname) VALUE ({telegram_id}, \'{username}\')",
         )
 
         return self.send_request(payload)
@@ -83,7 +85,7 @@ class DbExecutor:
     def update_data_name(self, telegram_id: int, name: str) -> None:
         """Update user name in db"""
         payload = self.sql_template.format(
-            sql_request=f"UPDATE {self.db_name} SET userName = \'{name}\' WHERE telegramID = {telegram_id}",
+            sql_request=f"UPDATE {self.db_type.user_accounts} SET userName = \'{name}\' WHERE telegramID = {telegram_id}",
         )
 
         return self.send_request(payload)
@@ -91,7 +93,7 @@ class DbExecutor:
     def update_data_mail(self, telegram_id: int, mail: str) -> None:
         """Update user email in db"""
         payload = self.sql_template.format(
-            sql_request=f"UPDATE {self.db_name} SET email = \'{mail}\', validMail = true WHERE telegramID = {telegram_id}",
+            sql_request=f"UPDATE {self.db_type.user_accounts} SET email = \'{mail}\', validMail = true WHERE telegramID = {telegram_id}",
         )
 
         return self.send_request(payload)
@@ -101,7 +103,7 @@ class DbExecutor:
         data = changePass.get_user_data(mail)
         user_name = f"{data[0]} {data[1]}"
         payload = self.sql_template.format(
-            sql_request=f"UPDATE {self.db_name} SET teamsMail = \'{mail}\', validTeams = true, userRole = \'{data[2]}\', userName = \'{user_name}\' WHERE telegramID = {telegram_id}",
+            sql_request=f"UPDATE {self.db_type.user_accounts} SET teamsMail = \'{mail}\', validTeams = true, userRole = \'{data[2]}\', userName = \'{user_name}\' WHERE telegramID = {telegram_id}",
         )
 
         return self.send_request(payload)
@@ -109,7 +111,7 @@ class DbExecutor:
     def check_user_in_base(self, telegram_id: int) -> bool:
         """Check is user in db"""
         payload = self.sql_template.format(
-            sql_request=f"SELECT * FROM {self.db_name} WHERE telegramID = {telegram_id}",
+            sql_request=f"SELECT * FROM {self.db_type.user_accounts} WHERE telegramID = {telegram_id}",
         )
         result = self.send_request(payload)
 
@@ -118,7 +120,7 @@ class DbExecutor:
     def get_valid_teams(self, telegram_id: int) -> bool:
         """Get user valid_teams status from db"""
         payload = self.sql_template.format(
-            sql_request=f"SELECT validTeams FROM {self.db_name} WHERE telegramID = {telegram_id}",
+            sql_request=f"SELECT validTeams FROM {self.db_type.user_accounts} WHERE telegramID = {telegram_id}",
         )
         result = self.send_request(payload)
 
@@ -127,7 +129,7 @@ class DbExecutor:
     def get_valid_mail(self, telegram_id: int) -> bool:
         """Get user valid_teams status from db"""
         payload = self.sql_template.format(
-            sql_request=f"SELECT validMail FROM {self.db_name} WHERE telegramID = {telegram_id}",
+            sql_request=f"SELECT validMail FROM {self.db_type.user_accounts} WHERE telegramID = {telegram_id}",
         )
         result = self.send_request(payload)
 
@@ -136,7 +138,7 @@ class DbExecutor:
     def get_teams(self, telegram_id: int) -> str:
         """Get user teams login from db"""
         payload = self.sql_template.format(
-            sql_request=f"SELECT teamsMail FROM {self.db_name} WHERE telegramID = {telegram_id}",
+            sql_request=f"SELECT teamsMail FROM {self.db_type.user_accounts} WHERE telegramID = {telegram_id}",
         )
         result = self.send_request(payload)
 
@@ -145,7 +147,7 @@ class DbExecutor:
     def get_user_data(self, telegram_id: int) -> str:
         """Get all user data from db"""
         payload = self.sql_template.format(
-            sql_request=f"SELECT * FROM {self.db_name} WHERE telegramID = {telegram_id}",
+            sql_request=f"SELECT * FROM {self.db_type.user_accounts} WHERE telegramID = {telegram_id}",
         )
         result = self.send_request(payload)[0]
         user_data = "Ваші дані \nEmail: {email} \nІм\'я та прізвище: {name} \nTeams email: {teams} \nПосада: {status}"

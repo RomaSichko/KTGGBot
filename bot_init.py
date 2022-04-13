@@ -11,6 +11,7 @@ import key
 from KTGGBot.constants.dbs import TestDbs, MainDbs
 from KTGGBot.constants.keypads import Keypads
 from KTGGBot.constants.messages import MessagesText
+from KTGGBot.constants.user_actions import UserAction
 
 
 class KTGGFunctions:
@@ -19,9 +20,20 @@ class KTGGFunctions:
         self.bot = bot
         self.actions = {}
         self.db_user = base_commands.DbExecutor()
-        self.db_user.db_type = TestDbs if base_commands.DbExecutor.current_db == "test" else MainDbs
+        self.db_user.db_type = TestDbs if self.db_user.current_db() == "test" else MainDbs
 
         self.mainIDMessage = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))[-1]['mainIDMessage'] + 1
+
+    def switch_db(self, message):
+        db = message.text.split()[1]
+        if message.chat.id == 684828985:
+            if db == "test":
+                self.db_user.db_type = TestDbs
+            elif db == "main":
+                self.db_user.db_type = MainDbs
+            self.db_user.switch_db(db)
+        else:
+            self.bot.send_message(message.chat.id, "Access denied")
 
     def welcome(self, message):
         self.delete_user_last_message(message=message)
@@ -89,7 +101,7 @@ class KTGGFunctions:
             file_info = self.bot.get_file(file_id)
             downloaded_file = self.bot.download_file(file_info.file_path)
 
-            uphoto = f"image {str(message.chat.id)}.jpg"
+            uphoto = f"image_{str(message.chat.id)}.jpg"
 
             with open(uphoto, 'wb') as new_file:
                 new_file.write(downloaded_file)
@@ -176,54 +188,52 @@ class KTGGFunctions:
         self.call = call
         print(self.actions)
         new_calls = {
-            "main-rules": self.main_rules_show,
-            "main-faq": self.main_faq_show,
-            "reset-password-without-account": self.reset_password_choice_verify_type,
-            "show-admin-online": self.admins_online_show,
-            "message-to-admin": self.message_to_admin_call,
-            "back-main-menu": self.back_to_main_menu,
-            "verify-student-ticket": self.verify_type_student_ticket,
-            "verify-id-card": self.verify_type_id_card,
-            "edit-email-account": self.edit_email_personal_account,
-            "edit-teams-account": self.edit_teams_personal_account,
-            "reset-password-account": self.reset_password_account,
-            "message-to-admin-account": self.message_to_admin_account,
-            "add-email-account": self.add_email_personal_account,
-            "add-teams-account": self.add_teams_personal_account,
-            "edit-email-account-work": self.edit_email_work_account,
-            "edit-teams-account-work": self.edit_teams_work_account,
-            "edit-data-account-work": self.edit_data_work_account,
-            "message-teams-to-admin-work": self.message_to_admin_work_account,
-            "message-other-to-admin-work": self.message_other_to_admin_work_account,
-            "add-email-account-work": self.add_email_work_account,
-            "add-teams-account-work": self.add_teams_work_account,
-            # "admin-reset-pass-id"
-            # "admin-reset-pass-pib"
-            # "admin-send-message"
-            # "admin-change-status"
-            # "admin-black-list"
-            # "admin-logout"
-            # "admin-tasks-list"
-            # "admin-tasks-status"
-            # "admin-worker-edit"
-            # "admin-tasks-questions"
-            # "admin-logout"
-            # "admin-delete-account"
-            # "admin-add-edbo-account"
-            # "admin-new-groups"
-            # "admin-new-year"
-            # "admin-logout"
-            # "admin-black-list-add"
-            # "admin-black-list-remove"
-            # "admin-back-main-menu"
-            # "task-status-new"
-            # "task-status-stoped"
-            # "task-status-in-progress"
-            # "task-status-done"
-            # "task-executor-1"
-            # "task-executor-2"
-            # "task-executor-3"
-            # "task-executor-4"
+            UserAction.main_rules: self.main_rules_show,
+            UserAction.main_faq: self.main_faq_show,
+            UserAction.reset_password_without_account: self.reset_password_choice_verify_type,
+            UserAction.show_admin_online: self.admins_online_show,
+            UserAction.message_to_admin: self.message_to_admin_call,
+            UserAction.back_main_menu: self.back_to_main_menu,
+            UserAction.verify_student_ticket: self.verify_type_student_ticket,
+            UserAction.verify_id_card: self.verify_type_id_card,
+            UserAction.edit_email_account: self.edit_email_personal_account,
+            UserAction.edit_teams_account: self.edit_teams_personal_account,
+            UserAction.reset_password_account: self.reset_password_account,
+            UserAction.message_to_admin_account: self.message_to_admin_account,
+            UserAction.add_email_account: self.add_email_personal_account,
+            UserAction.add_teams_account: self.add_teams_personal_account,
+            UserAction.edit_email_account_work: self.edit_email_work_account,
+            UserAction.edit_teams_account_work: self.edit_teams_work_account,
+            UserAction.edit_data_account_work: self.edit_data_work_account,
+            UserAction.message_teams_to_admin_work: self.message_to_admin_work_account,
+            UserAction.message_other_to_admin_work: self.message_other_to_admin_work_account,
+            UserAction.add_email_account_work: self.add_email_work_account,
+            UserAction.add_teams_account_work: self.add_teams_work_account,
+            # UserAction.admin_reset_pass_id
+            # UserAction.admin_reset_pass_pib
+            # UserAction.admin_send_message
+            # UserAction.admin_change_status
+            # UserAction.admin_black_list
+            # UserAction.admin_logout
+            # UserAction.admin_tasks_list
+            # UserAction.admin_tasks_status
+            # UserAction.admin_worker_edit
+            # UserAction.admin_tasks_questions
+            # UserAction.admin_delete_account
+            # UserAction.admin_add_edbo_account
+            # UserAction.admin_new_groups
+            # UserAction.admin_new_year
+            # UserAction.admin_black_list_add
+            # UserAction.admin_black_list_remove
+            # UserAction.admin_back_main_menu
+            # UserAction.task_status_new
+            # UserAction.task_status_stoped
+            # UserAction.task_status_in_progress
+            # UserAction.task_status_done
+            # UserAction.task_executor_1
+            # UserAction.task_executor_2
+            # UserAction.task_executor_3
+            # UserAction.task_executor_4
         }
         new_calls[call.data]()
 
@@ -795,27 +805,6 @@ class KTGGFunctions:
                     chat_id=message.chat.id,
                     text=ConstantMessages.UNKWOWN_ACTION,
                 )
-
-    def remove_from_dict(self, message):
-        msg = self.bot.send_message(
-            chat_id=message.chat.id,
-            text=ConstantMessages.NEXT_ACTION,
-            reply_markup=Keypads.REMOVE,
-        )
-        self.main_menu(msg)
-
-        if message.chat.id in self.user_base_reset:
-            try:
-                del (self.user_base_reset[message.chat.id])
-                del (self.base_message[message.chat.id])
-                del (self.teacher_message[message.chat.id])
-                del (self.teacher_call[message.chat.id])
-                del (self.teacher_base_reset[message.chat.id])
-                del (self.mailAuth[message.chat.id])
-                del (self.lastnameNameAuth[message.chat.id])
-                del (self.teamsAuth[message.chat.id])
-            except KeyError:
-                pass
 
     def add_user_to_black_list_admin(self, message):
         pass
