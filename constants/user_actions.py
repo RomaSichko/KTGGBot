@@ -1,7 +1,7 @@
 import enum
 
 
-class UserAction(enum.auto):
+class UserAction(enum.Enum):
     main_rules = enum.auto()
     main_faq = enum.auto()
     reset_password_without_account = enum.auto()
@@ -41,10 +41,24 @@ class UserAction(enum.auto):
     admin_black_list_remove = enum.auto()
     admin_back_main_menu = enum.auto()
     task_status_new = enum.auto()
-    task_status_stoped = enum.auto()
+    task_status_stopped = enum.auto()
     task_status_in_progress = enum.auto()
     task_status_done = enum.auto()
     task_executor_1 = enum.auto()
     task_executor_2 = enum.auto()
     task_executor_3 = enum.auto()
     task_executor_4 = enum.auto()
+
+    mark_answered = enum.auto()
+    cancel = enum.auto()
+
+
+class AdminRights(enum.Enum):
+    switch = enum.auto()
+    panel = enum.auto()
+    add_admin = enum.auto()
+    remove_admin = enum.auto()
+    answer_message = enum.auto()
+    reset_password = enum.auto()
+    tasks = enum.auto()
+    start_year = enum.auto()

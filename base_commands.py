@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-import datetime
-from typing import Any, Type
+from typing import Any, Type, List
 
 import requests
 
@@ -26,6 +25,8 @@ class DbExecutor:
     sql_template = "\n    \"operation\": \"sql\",\n    \"sql\": \"{sql_request}\"\n"
     db_type: MainDbs = None
 
+    logger = changePass.get_logger()
+
     def send_request(self, payload: str) -> Any:
         """Send POST request with custom payload"""
         url = key.get_base_key()
@@ -39,7 +40,7 @@ class DbExecutor:
 
         response = requests.request("POST", url, headers=headers, data=payload.encode('utf-8')).json()
 
-        print(f"{datetime.datetime.now()}: db work, payload \n{payload} \nresponse: {response}")
+        self.logger.info(msg=f"db work, payload \n{payload} \nresponse: {response}")
         return response
 
     def current_db(self):
@@ -57,11 +58,17 @@ class DbExecutor:
 
         self.send_request(payload)
 
-    def update_user_action(self, telegram_id: int, action: str):
+    def get_user_action(self, telegram_id: int):
         payload = self.sql_template.format(
-            sql_request=f"SELECT * FROM {self.db_type.user_actions} WHERE telegramID = {telegram_id}",
+            sql_request=f"SELECT action FROM {self.db_type.user_actions} WHERE telegramID = {telegram_id}",
         )
         response = self.send_request(payload)
+        if response:
+            return response[0]["action"]
+        return False
+
+    def update_user_action(self, telegram_id: int, action: str):
+        response = self.get_user_action(telegram_id=telegram_id)
 
         if not response:
             payload = self.sql_template.format(
@@ -157,5 +164,11 @@ class DbExecutor:
             teams=result["teamsMail"],
             status=result["userRole"],
         )
-
         return user_data
+
+    def get_admin(self, telegram_id: int) -> List:
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM {Dbs.admin} WHERE telegramId = {telegram_id}",
+        )
+        result = self.send_request(payload)
+        return result
