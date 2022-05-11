@@ -27,7 +27,7 @@ def my_account(message):
 
 @bot.message_handler(commands=['account_work'])
 def work_account(message):
-    ktgg_bot.my_account(message)
+    ktgg_bot.work_account(message)
 
 
 @bot.message_handler(content_types=['photo'])

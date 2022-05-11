@@ -76,8 +76,8 @@ class Keypads:
             types.InlineKeyboardButton("Змінити MS Teams", callback_data=UserAction.edit_teams_account_work.name)
         ],
         [
-            types.InlineKeyboardButton("Скинути пароль", callback_data=UserAction.reset_password_account.name),
-            types.InlineKeyboardButton("Змінити власні дані", callback_data=UserAction.edit_data_account_work.name),
+            types.InlineKeyboardButton("Скинути пароль", callback_data=UserAction.reset_password_account_work.name),
+            types.InlineKeyboardButton("Задачі", callback_data=UserAction.task_account_work.name),
         ],
         [
             types.InlineKeyboardButton("Повідомлення адміністратору (Teams)",
@@ -93,7 +93,7 @@ class Keypads:
             types.InlineKeyboardButton("Додати MS Teams", callback_data=UserAction.add_teams_account_work.name),
         ],
         [
-            types.InlineKeyboardButton("Змінити власні дані", callback_data=UserAction.edit_data_account_work.name),
+            types.InlineKeyboardButton("Задачі", callback_data=UserAction.task_account_work.name),
         ],
     ])
 
@@ -105,8 +105,8 @@ class Keypads:
         [
             types.InlineKeyboardButton("Повідомлення адміністратору (Teams)",
                                        callback_data=UserAction.message_teams_to_admin_work.name),
-            types.InlineKeyboardButton("Змінити власні дані",
-                                       callback_data=UserAction.edit_data_account_work.name),
+            types.InlineKeyboardButton("Задачі",
+                                       callback_data=UserAction.task_account_work.name),
         ],
         [
             types.InlineKeyboardButton("Повідомлення адміністратору (інше)",
@@ -120,8 +120,8 @@ class Keypads:
             types.InlineKeyboardButton("Змінити MS Teams", callback_data=UserAction.edit_teams_account_work.name)
         ],
         [
-            types.InlineKeyboardButton("Скинути пароль", callback_data=UserAction.reset_password_account.name),
-            types.InlineKeyboardButton("Змінити власні дані", callback_data=UserAction.edit_data_account_work.name),
+            types.InlineKeyboardButton("Скинути пароль", callback_data=UserAction.reset_password_account_work.name),
+            types.InlineKeyboardButton("Задачі", callback_data=UserAction.task_account_work.name),
         ],
         [
             types.InlineKeyboardButton("Повідомлення адміністратору (Teams)",

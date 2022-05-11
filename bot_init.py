@@ -1,5 +1,6 @@
 import datetime
 from random import randint
+from typing import Union
 
 import telebot
 from telebot.types import Message
@@ -7,14 +8,13 @@ from telebot.types import Message
 import changePass
 import os
 import codecs
-from telebot import types
 import json
 import base_commands
-import key
 from KTGGBot.constants.dbs import TestDbs, MainDbs
+from KTGGBot.constants.domains import Domains
 from KTGGBot.constants.keypads import Keypads
 from KTGGBot.constants.messages import MessagesText
-from KTGGBot.constants.user_actions import UserAction, AdminRights
+from KTGGBot.constants.user_actions import UserAction, AdminRights, SentFrom
 
 
 class KTGGFunctions:
@@ -64,11 +64,12 @@ class KTGGFunctions:
 
     def my_account(self, message):
         self.delete_user_last_message(message=message)
-        check = self.db_user.check_user_in_base(message.chat.id)
+        self._remove_keyboard(message)
+        check = self.db_user.check_user_in_main_base(message.chat.id)
 
         if check:
-            mail_exist = self.db_user.get_valid_mail(message.chat.id)
-            teams_mail_exist = self.db_user.get_valid_teams(message.chat.id)
+            mail_exist = self.db_user.get_valid_mail_main_account(message.chat.id)
+            teams_mail_exist = self.db_user.get_valid_teams_main_account(message.chat.id)
 
             if mail_exist and teams_mail_exist:
                 keypad = Keypads.ACCOUNT_MENU_FULL
@@ -81,7 +82,7 @@ class KTGGFunctions:
 
         else:
             keypad = Keypads.ACCOUNT_MENU_NEW_ACCOUNT
-            self.db_user.add_data(
+            self.db_user.add_data_main_account(
                 telegram_id=message.chat.id,
                 username=message.chat.username
             )
@@ -90,12 +91,56 @@ class KTGGFunctions:
                 text=MessagesText.ADDED_ACCOUNT_IN_DB,
             )
 
-        user_data_in_db = self.db_user.get_user_data(message.chat.id)
+        user_data_in_db = self.db_user.get_user_data_main_account(message.chat.id)
         self.bot.send_message(
             chat_id=message.chat.id,
-            text=user_data_in_db,
+            text=MessagesText.USER_ACCOUNT_MAIN.format(
+                email=user_data_in_db["email"],
+                name=user_data_in_db["userName"],
+                teams=user_data_in_db["teamsEmail"],
+            ),
             reply_markup=keypad,
         )
+
+    def work_account(self, message):
+        self.delete_user_last_message(message=message)
+        self._remove_keyboard(message)
+        check = self.db_user.check_user_in_work_base(message.chat.id)
+
+        if check:
+            mail_exist = self.db_user.get_valid_mail_work_account(message.chat.id)
+            teams_mail_exist = self.db_user.get_valid_teams_work_account(message.chat.id)
+
+            if mail_exist and teams_mail_exist:
+                keypad = Keypads.WORK_ACCOUNT_MENU_FULL
+            elif teams_mail_exist:
+                keypad = Keypads.WORK_ACCOUNT_MENU_WITH_TEAMS
+            elif mail_exist:
+                keypad = Keypads.WORK_ACCOUNT_MENU_WITH_MAIL
+            else:
+                keypad = Keypads.WORK_ACCOUNT_MENU_NEW
+
+            user_data_in_db = self.db_user.get_user_data_work_account(message.chat.id)
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_ACCOUNT_WORK.format(
+                    email=user_data_in_db["email"],
+                    name=user_data_in_db["userName"],
+                    teams=user_data_in_db["teamsEmail"],
+                ),
+                reply_markup=keypad,
+            )
+        else:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_ACCOUNT_WORK_NEW,
+                reply_markup=Keypads.CANCEL,
+            )
+
+            self.db_user.update_user_action(
+                telegram_id=message.chat.id,
+                action=UserAction.verify_work_account.name,
+            )
 
     def action_photo(self, message):
         if self.db_user.get_user_action(message.chat.id) == UserAction.verify_student_ticket.name:
@@ -119,7 +164,7 @@ class KTGGFunctions:
             if new_user_data[0]:
                 self.bot.send_message(
                     chat_id=message.chat.id,
-                    text=MessagesText.NEW_PASSWORD.format(
+                    text=MessagesText.RESETED_PASSWORD.format(
                         login=new_user_data[2],
                         password=new_user_data[1],
                     )
@@ -177,7 +222,6 @@ class KTGGFunctions:
             )
 
     def callback_worker(self, call):
-        self.call = call
         new_calls = {
             UserAction.main_rules.name: self.main_rules_show,
             UserAction.main_faq.name: self.main_faq_show,
@@ -190,12 +234,13 @@ class KTGGFunctions:
             UserAction.edit_email_account.name: self.edit_email_personal_account,
             UserAction.edit_teams_account.name: self.edit_teams_personal_account,
             UserAction.reset_password_account.name: self.reset_password_account,
+            UserAction.reset_password_account_work.name: self.reset_password_account_work,
             UserAction.message_to_admin_account.name: self.message_to_admin_account,
             UserAction.add_email_account.name: self.add_email_personal_account,
             UserAction.add_teams_account.name: self.add_teams_personal_account,
             UserAction.edit_email_account_work.name: self.edit_email_work_account,
             UserAction.edit_teams_account_work.name: self.edit_teams_work_account,
-            UserAction.edit_data_account_work.name: self.edit_data_work_account,
+            UserAction.task_account_work.name: self.edit_data_work_account,
             UserAction.message_teams_to_admin_work.name: self.message_to_admin_work_account,
             UserAction.message_other_to_admin_work.name: self.message_other_to_admin_work_account,
             UserAction.add_email_account_work.name: self.add_email_work_account,
@@ -228,576 +273,7 @@ class KTGGFunctions:
             # UserAction.task_executor_4
             UserAction.mark_answered.name: self.admin_mark_answered,
         }
-        new_calls[call.data]()
-
-    def text_handle1r(self, message):
-
-        if message.text == ConstantMessages.CANCEL:
-            self.remove_from_dict(message)
-            return
-
-        elif message.text == ConstantMessages.FINISH:
-            if message.chat.id in self.admin_base:
-                msg = self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.ACTION,
-                    reply_markup=Keypads.REMOVE,
-                )
-
-                self.admin_panel(msg)
-
-                if "delete" in self.admin_base[message.chat.id] and self.admin_base[message.chat.id]["delete"]:
-                    self.admin_base[message.chat.id]["delete"] = False
-
-        elif message.text == ConstantMessages.FINISH_CALL:
-            if message.chat.id in self.teacher_call:
-
-                if message.chat.id in self.teacher_call and 'msg' in self.teacher_call[message.chat.id]:
-                    for i in self.teacher_call[message.chat.id]['msg']:
-                        self.bot.delete_message(message.chat.id, i)
-
-                msg = self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.ACTION,
-                    reply_markup=Keypads.REMOVE,
-                )
-
-                self.main_menu(msg)
-
-                self.remove_from_dict(message)
-
-        elif message.text in '🔴🟠🟡🟢':
-
-            markup = types.ReplyKeyboardRemove(selective=False)
-            base = json.load(codecs.open("admin.json", 'r', 'utf-8-sig'))
-
-            for i in base:
-                if i['id'] == message.chat.id and i['islog']:
-                    i['status'] = message.text
-
-                    with open('admin.json', 'w') as file:
-                        json.dump(base, file)
-
-                    msg = self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.STATUS_CHANGE,
-                        reply_markup=Keypads.REMOVE,
-                    )
-
-                    self.main_menu(msg)
-
-        if message.chat.id in self.user_base_reset and self.user_base_reset[message.chat.id]:
-            text = message.text.split()
-            if len(text) == 4:
-                self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.WAIT_DATA_CHECK,
-                    reply_markup=Keypads.REMOVE,
-                )
-
-                new_data = changePass.reset_pass_idcard(text[0], text[1], text[2], text[3])
-                file = codecs.open("pass.txt", "a", 'utf-8')
-
-                if new_data[0]:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.NEW_PASSWORD.format(
-                            login=new_data[2],
-                            password=new_data[1],
-                        ),
-                        reply_markup=Keypads.REMOVE,
-                    )
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.NEXT_ACTION,
-                        reply_markup=Keypads.MAIN_MENU,
-                    )
-
-                    self.remove_from_dict(message)
-
-                elif not new_data[0] and new_data[1] != "":
-
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.CARD_DATA_NOT_FOUND,
-                    )
-
-                else:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.NOT_FOUND_WITHOUT_ACC,
-                        reply_markup=Keypads.REMOVE,
-                    )
-
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.NEXT_ACTION,
-                        reply_markup=Keypads.MAIN_MENU,
-                    )
-
-                    self.remove_from_dict(message)
-
-                file.close()
-
-            else:
-                self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.INVALID_DATA,
-                )
-
-        elif message.chat.id in self.teacher_base_reset and self.teacher_base_reset[message.chat.id]:
-            if self.teacher_base_reset[message.chat.id]["id"]:
-                text = message.text.split()
-                if len(text) == 4:
-                    new_data = changePass.reset_pass_teacher(text[0], text[1], text[2], text[3])
-                    file = codecs.open("pass.txt", "a", 'utf-8')
-
-                    if new_data[0]:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.NEW_PASSWORD.format(
-                                login=new_data[2],
-                                password=new_data[1],
-                            ),
-                            reply_markup=Keypads.REMOVE,
-                        )
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.NEXT_ACTION,
-                            reply_markup=Keypads.MAIN_MENU,
-                        )
-
-                        self.remove_from_dict(message)
-
-                    elif not new_data[0] and new_data[1] != "":
-
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.CARD_DATA_NOT_FOUND,
-                        )
-
-                    else:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.NOT_FOUND_WITHOUT_ACC,
-                            reply_markup=Keypads.REMOVE,
-                        )
-
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.NEXT_ACTION,
-                            reply_markup=Keypads.MAIN_MENU,
-                        )
-                        self.remove_from_dict(message)
-                    file.close()
-                else:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.INVALID_DATA,
-                    )
-
-        elif message.chat.id in self.base_message:
-            if self.base_message[message.chat.id]["message"]:
-                base = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
-
-                temp_base = {'mainIDMessage': self.mainIDMessage, "id": message.chat.id,
-                            'username': message.chat.username,
-                            "from": "Student", "status": False, "message": message.text}
-
-                base.append(temp_base)
-
-                with open("message.json", "w") as outfile:
-                    json.dump(base, outfile)
-
-                self.mainIDMessage += 1
-
-                self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.MESSAGE_SENT_ADMIN,
-                    reply_markup=Keypads.REMOVE,
-                )
-
-                self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.NEXT_ACTION,
-                    reply_markup=Keypads.MAIN_MENU,
-                )
-
-                self.remove_from_dict(message)
-
-        elif message.chat.id in self.admin_base:
-            if not self.admin_base[message.chat.id]["verify"]:
-                if message.text == key.get_admin_key():
-                    self.admin_base[message.chat.id]["verify"] = True
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.SUCCESS_VERIFY,
-                    )
-                    self.admin_panel(message)
-                else:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.BAD_VERIFY,
-                    )
-            else:
-                if "id" in self.admin_base[message.chat.id] and self.admin_base[message.chat.id]["id"]:
-                    if '@ktgg.kiev.ua' in message.text or '@kdktgg.onmicrosoft.com' in message.text:
-                        new_data = changePass.reset_pass_bot(message.text)
-
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.NEW_PASSWORD.format(
-                                login=new_data[2],
-                                password=new_data[1],
-                            ),
-                            reply_markup=Keypads.REMOVE,
-                        )
-
-                    else:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.INVALID_DATA,
-                        )
-
-                    del (self.admin_base[message.chat.id]["id"])
-
-                elif "pib" in self.admin_base[message.chat.id] and self.admin_base[message.chat.id]["pib"]:
-                    text = message.text.split()
-                    if len(text) == 2:
-                        new_data = changePass.reset_pass_bot("0", message.text.split()[0], message.text.split()[1])
-
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.NEW_PASSWORD.format(
-                                login=new_data[2],
-                                password=new_data[1],
-                            ),
-                            reply_markup=Keypads.REMOVE,
-                        )
-
-                    else:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.INVALID_DATA,
-                        )
-
-                    del (self.admin_base[message.chat.id]["pib"])
-
-                elif "id-message" in self.admin_base[message.chat.id] and self.admin_base[message.chat.id][
-                    "id-message"]:
-                    m = message.text.split()
-
-                    if len(m) >= 3:
-
-                        if m[0].isdigit():
-                            base = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
-
-                            for i in base:
-                                if i['mainIDMessage'] == int(m[0]) and i['id'] == int(m[1]):
-                                    if not i['status']:
-
-                                        if m[2].lower() == 'true':
-                                            msg = self.bot.send_message(
-                                                chat_id=message.chat.id,
-                                                text=ConstantMessages.MESSAGE_MARK,
-                                            )
-
-                                        else:
-                                            self.bot.send_message(
-                                                chat_id=int(m[1]),
-                                                text=ConstantMessages.MESSAGE_FROM_ADMIN.format(
-                                                    answer=' '.join(m[2:]),
-                                                ))
-                                            msg = self.bot.send_message(
-                                                chat_id=message.chat.id,
-                                                text=ConstantMessages.MESSAGE_SENT,
-                                            )
-                                        self.admin_panel(msg)
-
-                                        i['status'] = True
-                                        i['answer'] = ' '.join(m[2:])
-                                        i['admin'] = message.chat.id
-                                    else:
-                                        msg = self.bot.send_message(
-                                            chat_id=message.chat.id,
-                                            text=ConstantMessages.ALREADY_ANSWERED,
-                                        )
-                                        self.admin_panel(msg)
-
-                            with open("message.json", "w") as outfile:
-                                json.dump(base, outfile)
-
-                        else:
-                            self.bot.send_message(
-                                chat_id=message.chat.id,
-                                text=ConstantMessages.INVALID_DATA,
-                            )
-                    else:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.INVALID_DATA,
-                        )
-
-                    del (self.admin_base[message.chat.id]["id-message"])
-
-                elif "delete" in self.admin_base[message.chat.id] and self.admin_base[message.chat.id]["delete"]:
-                    m = message.text.split()
-
-                    result = changePass.detete_user(m[0], m[1])
-
-                    if result[0]:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.SUCCESS_DELETE.format(
-                                user=result[2],
-                                id=result[1],
-                            )
-                        )
-
-                    else:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.FAIL_DELETE.format(
-                                lastname=m[1],
-                                name=m[0],
-                            )
-                        )
-
-        elif message.chat.id in self.teacher_message:
-            if not self.teacher_message[message.chat.id]["isLog"]:
-                message_text = message.text.split()
-                teacher_id = message_text[0]
-                teacher_name = ' '.join(message_text[1:])
-
-                if teacher_id.isdigit() and teacher_name:
-                    teachers = json.load(codecs.open("teacher.json", 'r', 'utf-8-sig'))
-
-                    for i in teachers:
-                        # print(i)
-                        if i['ID працівника'] == teacher_id and i['ПІБ'] == teacher_name:
-                            self.teacher_message[message.chat.id]["isLog"] = True
-
-                            self.bot.send_message(
-                                chat_id=message.chat.id,
-                                text=f"{ConstantMessages.SUCCESS_VERIFY}. {ConstantMessages.SEND_MESSAGE_CANCEL}",
-                                reply_markup=Keypads.CANCEL,
-                            )
-
-                    if not self.teacher_message[message.chat.id]["isLog"]:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.CARD_DATA_NOT_FOUND,
-                            reply_markup=Keypads.CANCEL,
-                        )
-
-                else:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.INVALID_DATA,
-                        reply_markup=Keypads.CANCEL,
-                    )
-
-            elif self.teacher_message[message.chat.id]["isLog"]:
-                base = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
-
-                temp_base = {'mainIDMessage': self.mainIDMessage, "id": message.chat.id,
-                            'username': message.chat.username,
-                            "from": "Teacher", "status": False, "message": message.text}
-
-                base.append(temp_base)
-
-                # print(base)
-
-                with open("message.json", "w") as outfile:
-                    json.dump(base, outfile)
-
-                self.mainIDMessage += 1
-                self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.MESSAGE_SENT_ADMIN,
-                    reply_markup=Keypads.REMOVE,
-                )
-
-                # bot.send_message(684828985,"id: " + str(message.chat.id) + '\n' + message.text)
-
-                self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.NEXT_ACTION,
-                    reply_markup=Keypads.BACK_TO_MAIN_MENU,
-                )
-
-                self.remove_from_dict(message)
-
-        elif message.chat.id in self.teacher_call:
-            if not self.teacher_call[message.chat.id]["isLog"]:
-                message_text = message.text.split()
-                teacher_id = message_text[0]
-                teacher_name = ' '.join(message_text[1:])
-
-                keyboard = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=1)
-                item = types.KeyboardButton("Відмінити")
-                keyboard.row(item)
-
-                if teacher_id.isdigit() and teacher_name:
-                    teachers = json.load(codecs.open("teacher.json", 'r', 'utf-8-sig'))
-
-                    for i in teachers:
-                        # print(i)
-                        if i['ID працівника'] == teacher_id and i['ПІБ'] == teacher_name:
-
-                            self.teacher_call[message.chat.id]["isLog"] = True
-
-                            base = json.load(codecs.open("admin.json", 'r', 'utf-8-sig'))
-
-                            msg_id_list = []
-
-                            for j in base:
-                                if j['status'] == '🟢':
-                                    msg = self.bot.send_contact(
-                                        chat_id=message.chat.id,
-                                        phone_number=j["phone"],
-                                        first_name=j["name"],
-                                        timeout=5,
-                                        reply_markup=Keypads.REMOVE,
-                                    )
-                                    msg_id_list.append(msg.id)
-
-                            self.bot.send_message(
-                                chat_id=message.chat.id,
-                                text=ConstantMessages.CALL_ADMIN,
-                                reply_markup=Keypads.CANCEL,
-                            )
-
-                            self.teacher_call[message.chat.id].update({'msg': msg_id_list})
-
-                    if not self.teacher_call[message.chat.id]["isLog"]:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.CARD_DATA_NOT_FOUND,
-                            reply_markup=Keypads.CANCEL,
-                        )
-
-                else:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.INVALID_DATA,
-                        reply_markup=Keypads.CANCEL,
-                    )
-
-            elif self.teacher_call[message.chat.id]["isLog"]:
-                pass
-
-        elif message.chat.id in self.mailAuth:
-            if self.mailAuth[message.chat.id]["code"] is None:
-                if changePass.valid_mail(message.text):
-                    password = str(randint(100000, 999999))
-                    self.mailAuth[message.chat.id]["code"] = password
-                    self.mailAuth[message.chat.id]["mail"] = message.text
-                    changePass.mail_send(message.text, password)
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.MAIL_CONFIRM_CODE,
-                    )
-                else:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.INVALID_MAIL,
-                        )
-            elif self.mailAuth[message.chat.id]["code"]:
-                if message.text == self.mailAuth[message.chat.id]["code"]:
-                    markup = types.ReplyKeyboardRemove(selective=False)
-                    base_commands.update_data_mail(message.chat.id, self.mailAuth[message.chat.id]["mail"])
-                    msg = self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.MAIL_CONFIRMED,
-                        reply_markup=Keypads.REMOVE,
-                    )
-                    self.remove_from_dict(message)
-                    self.my_account(msg)
-                else:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.INVALID_CONFIRM_CODE,
-                    )
-
-        elif message.chat.id in self.teamsAuth:
-            if self.teamsAuth[message.chat.id]["code"] is None:
-                if changePass.valid_mail(message.text):
-                    if (message.text[message.text.find('@') + 1:] == "kdktgg.onmicrosoft.com"
-                            or message.text[message.text.find('@') + 1:] == "ktgg.kiev.ua"):
-                        if changePass.valid_teams(message.text):
-                            password = str(randint(100000, 999999))
-                            self.teamsAuth[message.chat.id]["code"] = password
-                            self.teamsAuth[message.chat.id]["mail"] = message.text
-                            changePass.mail_send(message.text, password)
-                            self.bot.send_message(
-                                chat_id=message.chat.id,
-                                text=ConstantMessages.TEAMS_CONFIRM_CODE,
-                                )
-                        else:
-                            self.bot.send_message(
-                                chat_id=message.chat.id,
-                                text=ConstantMessages.INVALID_TEAMS,
-                                )
-                    else:
-                        self.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=ConstantMessages.INVALID_TEAMS,
-                        )
-                else:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.UNREAL_MAIL,
-                        )
-
-            elif self.teamsAuth[message.chat.id]["code"]:
-                if message.text == self.teamsAuth[message.chat.id]["code"]:
-                    markup = types.ReplyKeyboardRemove(selective=False)
-                    base_commands.update_data_teams(message.chat.id, self.teamsAuth[message.chat.id]["mail"])
-                    msg = self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.CONFIRMED_ACCOUNT,
-                        reply_markup=Keypads.REMOVE,
-                    )
-                    self.remove_from_dict(message)
-                    self.my_account(msg)
-                else:
-                    self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=ConstantMessages.INVALID_CONFIRM_CODE,
-                    )
-
-        elif message.chat.id in self.lastnameNameAuth:
-            if self.lastnameNameAuth[message.chat.id]['lastname']:
-                base_commands.update_data_lastname(message.chat.id, message.text)
-                msg = self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.CHANGE_ACCOUNT_DATA,
-                    reply_markup=Keypads.REMOVE,
-                )
-                try:
-                    del (self.lastnameNameAuth[message.chat.id])
-                except KeyError:
-                    pass
-                self.my_account(msg)
-            elif self.lastnameNameAuth[message.chat.id]['name']:
-                base_commands.update_data_name(message.chat.id, message.text)
-                msg = self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.CHANGE_ACCOUNT_DATA,
-                    reply_markup=Keypads.REMOVE,
-                )
-                self.remove_from_dict(message)
-                self.my_account(msg)
-
-        else:
-            if message.chat.id == 684828985 or message.chat.id == 461655305 or message.chat.id == 365794368:
-                pass
-            else:
-                self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=ConstantMessages.UNKWOWN_ACTION,
-                )
+        new_calls[call.data](call)
 
     def add_user_to_black_list_admin(self, message):
         pass
@@ -820,25 +296,28 @@ class KTGGFunctions:
             message_id=message.id,
         )
 
-    def main_rules_show(self):
+    def main_rules_show(self, call):
         self._edit_message_call(
             text=MessagesText.MAIN_RULES,
             reply_markup=Keypads.BACK_TO_MAIN_MENU,
+            call=call,
         )
 
-    def main_faq_show(self):
+    def main_faq_show(self, call):
         self._edit_message_call(
             text=MessagesText.MAIN_FAQ,
             reply_markup=Keypads.BACK_TO_MAIN_MENU,
+            call=call
         )
 
-    def reset_password_choice_verify_type(self):
+    def reset_password_choice_verify_type(self, call):
         self._edit_message_call(
             text=MessagesText.RESET_PASSWORD_WITHOUT_ACC_CHOICE_VERIFY_TYPE,
             reply_markup=Keypads.TYPE_OF_RESET,
+            call=call,
         )
 
-    def admins_online_show(self):
+    def admins_online_show(self, call):
         admin_status_template = "\t{name} {status}\n"
         message_text = "Статуси:\n\t🔴 - зайнятий\n\t🟠 - не активний\n\t🟡 - на парі\n\t🟢 - вільний\nАдміни:\n"
 
@@ -851,121 +330,177 @@ class KTGGFunctions:
         self._edit_message_call(
             text=message_text,
             reply_markup=Keypads.BACK_TO_MAIN_MENU,
+            call=call
         )
 
-    def message_to_admin_call(self):
+    def message_to_admin_call(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_TO_ADMIN,
             reply_markup=Keypads.CANCEL,
+            call=call,
         )
 
-    def back_to_main_menu(self):
+    def back_to_main_menu(self, call):
         self._edit_message_call(
             text=MessagesText.MENU_MESSAGES,
             reply_markup=Keypads.MAIN_MENU,
+            call=call
         )
 
-    def verify_type_student_ticket(self):
+    def verify_type_student_ticket(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_STUDENT_TICKET_RESET_TYPE,
             reply_markup=Keypads.CANCEL,
+            call=call,
         )
 
-    def verify_type_id_card(self):
+    def verify_type_id_card(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_ID_CARD_RESET_TYPE,
             reply_markup=Keypads.CANCEL,
+            call=call,
         )
 
-    def edit_email_personal_account(self):
-        self.edit_email_account()
+    def edit_email_personal_account(self, call):
+        self.edit_email_account(call=call)
 
-    def edit_teams_personal_account(self):
-        self.edit_teams_account()
+    def edit_teams_personal_account(self, call):
+        self.edit_teams_account(call=call)
 
-    def edit_email_work_account(self):
-        self.edit_email_account()
+    def edit_email_work_account(self, call):
+        self.edit_email_account(call=call)
 
-    def edit_teams_work_account(self):
-        self.edit_teams_account()
+    def edit_teams_work_account(self, call):
+        self.edit_teams_account(call=call)
 
-    def add_email_personal_account(self):
-        self.add_email_account()
+    def add_email_personal_account(self, call):
+        self.add_email_account(call=call)
 
-    def add_teams_personal_account(self):
-        self.add_teams_account()
+    def add_teams_personal_account(self, call):
+        self.add_teams_account(call=call)
 
-    def add_email_work_account(self):
-        self.add_email_account()
+    def add_email_work_account(self, call):
+        self.add_email_account(call=call)
 
-    def add_teams_work_account(self):
-        self.add_teams_account()
+    def add_teams_work_account(self, call):
+        self.add_teams_account(call=call)
 
-    def message_to_admin_account(self):
-        self.message_to_admin_call()
+    def message_to_admin_account(self, call):
+        self.message_to_admin_call(call=call)
 
-    def message_to_admin_work_account(self):
-        self.message_to_admin_call()
+    def message_to_admin_work_account(self, call):
+        self.message_to_admin_call(call=call)
 
-    def message_other_to_admin_work_account(self):
+    def message_other_to_admin_work_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_TO_ADMIN_NO_TEAMS,
             reply_markup=Keypads.CANCEL,
+            call=call,
         )
 
-    def reset_password_account(self):
+    def reset_password_account(self, call):
+        self._remove_old_message_send_message_call(
+            text=MessagesText.MESSAGE_RESET_PASSWORD_ACCOUNT,
+            reply_markup=Keypads.REMOVE,
+            call=call
+        )
+        checker, password, user_id = self.ms_teams.reset_password(
+            user_id=self.db_user.get_teams_main_account(telegram_id=call.message.chat.id),
+        )
+        if checker:
+            self.bot.send_message(
+                chat_id=call.message.chat.id,
+                text=MessagesText.RESETED_PASSWORD.format(
+                    login=user_id,
+                    password=password,
+                ),
+            )
+            self.my_account(call.message)
+        else:
+            self.bot.send_message(
+                chat_id=call.message.chat.id,
+                text="Невідома помилка",
+            )
+            self.my_account(call.message)
+
+    def reset_password_account_work(self, call):
         self._edit_message_call(
             text=MessagesText.MESSAGE_RESET_PASSWORD_ACCOUNT,
             reply_markup=Keypads.REMOVE,
+            call=call
         )
+        checker, password, user_id = self.ms_teams.reset_password(
+            user_id=self.db_user.get_teams_work_account(telegram_id=call.message.chat.id),
+        )
+        if checker:
+            self.bot.send_message(
+                chat_id=call.message.chat.id,
+                text=MessagesText.RESETED_PASSWORD.format(
+                    login=user_id,
+                    password=password,
+                ),
+            )
+            self.work_account(call.message)
+        else:
+            self.bot.send_message(
+                chat_id=call.message.chat.id,
+                text="Невідома помилка",
+            )
+            self.work_account(call.message)
 
-    def edit_data_work_account(self):
+    def edit_data_work_account(self, call):
         self._remove_old_message_send_message_call(
-            text=MessagesText.MESSAGE_EDIT_DATA_ACCOUNT,
+            text="Дана дія поки що недоступна",
             reply_markup=Keypads.CANCEL,
+            call=call,
         )
+        self.work_account(call.message)
 
-    def add_email_account(self):
+    def add_email_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_ADD_EMAIL_ACCOUNT,
             reply_markup=Keypads.CANCEL,
+            call=call
         )
 
-    def add_teams_account(self):
+    def add_teams_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_ADD_TEAMS_ACCOUNT,
             reply_markup=Keypads.CANCEL,
+            call=call,
         )
 
-    def edit_email_account(self):
+    def edit_email_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_EDIT_EMAIL_ACCOUNT,
             reply_markup=Keypads.CANCEL,
+            call=call,
         )
 
-    def edit_teams_account(self):
+    def edit_teams_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_EDIT_TEAMS_ACCOUNT,
             reply_markup=Keypads.CANCEL,
+            call=call,
         )
 
-    def _edit_message_call(self, text: str, reply_markup: telebot.REPLY_MARKUP_TYPES):
+    def _edit_message_call(self, text: str, reply_markup: telebot.REPLY_MARKUP_TYPES, call):
         self.bot.edit_message_text(
-            message_id=self.call.message.id,
-            chat_id=self.call.message.chat.id,
+            message_id=call.message.id,
+            chat_id=call.message.chat.id,
             text=text,
             reply_markup=reply_markup,
         )
-        self.db_user.update_user_action(self.call.message.chat.id, self.call.data)
+        self.db_user.update_user_action(call.message.chat.id, call.data)
 
-    def _remove_old_message_send_message_call(self, text: str, reply_markup: telebot.REPLY_MARKUP_TYPES):
-        self.delete_user_last_message(message=self.call.message)
+    def _remove_old_message_send_message_call(self, text: str, reply_markup: telebot.REPLY_MARKUP_TYPES, call):
+        self.delete_user_last_message(message=call.message)
         self.bot.send_message(
-            chat_id=self.call.message.chat.id,
+            chat_id=call.message.chat.id,
             text=text,
             reply_markup=reply_markup,
         )
-        self.db_user.update_user_action(self.call.message.chat.id, self.call.data)
+        self.db_user.update_user_action(call.message.chat.id, call.data)
 
     def _get_admin_right(self, user_id: int, right: AdminRights = None) -> bool:
         admin_in_db = self.db_user.get_admin(telegram_id=user_id)
@@ -976,77 +511,87 @@ class KTGGFunctions:
             return True
         return False
 
-    def admin_reset_password_by_id(self):
+    def admin_reset_password_by_id(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.ADMIN_PANEL_RESET_PASSWORD_BY_ID,
             reply_markup=Keypads.CANCEL,
+            call=call
         )
 
-    def admin_reset_password_by_pib(self):
+    def admin_reset_password_by_pib(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.ADMIN_PANEL_RESET_PASSWORD_BY_PIB,
             reply_markup=Keypads.CANCEL,
+            call=call
         )
 
-    def admin_send_message(self):
+    def admin_send_message(self, call):
         # TODO: refactor message text
-        if self._get_admin_right(self.call.message.chat.id, AdminRights.answer_message):
+        if self._get_admin_right(call.message.chat.id, AdminRights.answer_message):
             messages = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
 
             for message in messages:
                 if not message['status']:
                     self.bot.send_message(
-                        chat_id=self.call.message.chat.id,
+                        chat_id=call.message.chat.id,
                         text=(f"mainIDMessage: {message['mainIDMessage']} \n"
                               f"id: {message['id']} \n"
                               f"username: {message['username']} \n"
                               f"Message: {message['message']} \n"
+                              f"Topic: {message['topic']} \n"
+                              f"SentFrom: {message['sentFrom']}\n"
+                              f"Additional data: {message['additionalData']}\n"
                               f"Time: {message['time']} \n"),
                         reply_markup=Keypads.MARK_ANSWERED,
                     )
 
             self.bot.send_message(
-                chat_id=self.call.message.chat.id,
+                chat_id=call.message.chat.id,
                 text="mainIDMessage / ID user / message",
                 reply_markup=Keypads.CANCEL,
             )
-            self.db_user.update_user_action(self.call.message.chat.id, self.call.data)
+            self.db_user.update_user_action(call.message.chat.id, call.data)
         else:
             self.bot.send_message(
-                chat_id=self.call.message.chat.id,
+                chat_id=call.message.chat.id,
                 text=MessagesText.ADMIN_PANEL_WITHOUT_RIGHTS,
             )
 
-    def admin_mark_answered(self):
+    def admin_mark_answered(self, call):
         messages = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
         for message in messages:
-            if message['mainIDMessage'] == int(self.call.message.text.split()[1]):
+            if message['mainIDMessage'] == int(call.message.text.split()[1]):
                 message["status"] = True
 
         with open("message.json", "w") as outfile:
             json.dump(messages, outfile)
 
-        self.delete_user_last_message(message=self.call.message)
+        self.delete_user_last_message(message=call.message)
 
     def text_handler(self, message: Message):
         if message.text == "Відмінити":
             self.text_cancel_message(message)
+            return
 
         message_handle = {
-            UserAction.message_to_admin.name: self.text_message_to_admin,
+            UserAction.message_to_admin.name: self.test_message_to_admin_main_menu,
             UserAction.verify_id_card.name: self.text_verify_id_card,
-            # UserAction.edit_email_account.name: None,
-            # UserAction.edit_teams_account.name: None,
-            # UserAction.message_to_admin_account.name: None,
-            # UserAction.add_email_account.name: None,
-            # UserAction.add_teams_account.name: None,
-            # UserAction.edit_email_account_work.name: None,
-            # UserAction.edit_teams_account_work.name: None,
-            # UserAction.edit_data_account_work.name: None,
-            # UserAction.message_teams_to_admin_work.name: None,
-            # UserAction.message_other_to_admin_work.name: None,
-            # UserAction.add_email_account_work.name: None,
-            # UserAction.add_teams_account_work.name: None,
+            UserAction.edit_email_account.name: self.text_add_edit_email_account,
+            UserAction.edit_teams_account.name: self.text_add_edit_teams_account,
+            UserAction.message_to_admin_account.name: self.test_message_to_admin_account,
+            UserAction.add_email_account.name: self.text_add_edit_email_account,
+            UserAction.add_teams_account.name: self.text_add_edit_teams_account,
+            UserAction.edit_email_account_work.name: self.text_add_edit_email_account_work,
+            UserAction.edit_teams_account_work.name: self.text_add_edit_teams_account_work,
+            UserAction.message_teams_to_admin_work.name: self.test_message_to_admin_work_account,
+            UserAction.message_other_to_admin_work.name: self.test_message_to_admin_work_account_other,
+            UserAction.verify_work_account.name: self.text_verify_work_account,
+            UserAction.add_email_account_work.name: self.text_add_edit_email_account_work,
+            UserAction.add_teams_account_work.name: self.text_add_edit_teams_account_work,
+            UserAction.email_confirm_code.name: self.text_email_confirm_code,
+            UserAction.teams_confirm_code.name: self.text_teams_confirm_code,
+            UserAction.email_confirm_code_work.name: self.text_email_confirm_code_work,
+            UserAction.teams_confirm_code_work.name: self.text_teams_confirm_code_work,
 
             UserAction.admin_reset_pass_id.name: self.text_admin_reset_pass_id,
             UserAction.admin_reset_pass_pib.name: self.text_admin_reset_pass_pib,
@@ -1071,44 +616,68 @@ class KTGGFunctions:
         )
         message_handle[action](message=message)
 
-    def text_message_to_admin(self, message: Message):
-        try:
-            if message.text != "Відмінити":
-                message_template = {
-                    "mainIDMessage": self.mainIDMessage,
-                    "admin": None,
-                    "answer": None,
-                    "id": message.chat.id,
-                    "message": message.text,
-                    "status": False,
-                    "username": message.chat.username,
-                    "time": datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-                }
+    def text_common_message_to_admin(self, message: Message, sent_from: SentFrom):
+        message_topics = {
+            SentFrom.main_menu: None,
+            SentFrom.user_account: "Проблема користувача",
+            SentFrom.work_account: "Проблема працівника (Teams)",
+            SentFrom.work_account_other: "Проблема працівника (Інше)"
+        }
+        message_template = {
+            "mainIDMessage": self.mainIDMessage,
+            "admin": None,
+            "answer": None,
+            "id": message.chat.id,
+            "message": message.text,
+            "status": False,
+            "username": message.chat.username,
+            "topic": message_topics[sent_from],
+            "sentFrom": sent_from.name,
+            "additionalData": self._generate_additional_data_message_to_admin(
+                telegram_id=message.chat.id,
+                sent_from=sent_from,
+            ),
+            "time": datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"),
+        }
 
-                messages = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
-                messages.append(message_template)
+        messages = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
+        messages.append(message_template)
 
-                with open("message.json", "w") as outfile:
-                    json.dump(messages, outfile)
+        with open("message.json", "w") as outfile:
+            json.dump(messages, outfile)
 
-                self.bot.send_message(
-                    chat_id=message.chat.id,
-                    text=MessagesText.MESSAGE_TO_ADMIN_SENDED,
-                    reply_markup=Keypads.REMOVE,
-                )
-            self.mainIDMessage += 1
-            self.main_menu(message)
+        self.bot.send_message(
+            chat_id=message.chat.id,
+            text=MessagesText.MESSAGE_TO_ADMIN_SENDED,
+            reply_markup=Keypads.REMOVE,
+        )
 
-        except Exception as exc:
-            self.bot.send_message(
-                chat_id=message.chat.id,
-                text="Виникла помилка в роботі бота, адміністратор уже знає про помилку, вибач за незручності",
-                reply_markup=Keypads.REMOVE,
-            )
-            self.bot.send_message(
-                chat_id=684828985,
-                text=f"message_to_admin-id-{message.chat.id}-exc-{str(exc)}",
-            )
+        self.mainIDMessage += 1
+        self.main_menu(message)
+
+    def test_message_to_admin_main_menu(self, message: Message):
+        self.text_common_message_to_admin(
+            message=message,
+            sent_from=SentFrom.main_menu,
+        )
+
+    def test_message_to_admin_account(self, message: Message):
+        self.text_common_message_to_admin(
+            message=message,
+            sent_from=SentFrom.user_account,
+        )
+
+    def test_message_to_admin_work_account(self, message: Message):
+        self.text_common_message_to_admin(
+            message=message,
+            sent_from=SentFrom.work_account,
+        )
+
+    def test_message_to_admin_work_account_other(self, message: Message):
+        self.text_common_message_to_admin(
+            message=message,
+            sent_from=SentFrom.work_account_other,
+        )
 
     def text_verify_id_card(self, message: Message):
         lastname, name, thirdname, passport = message.text.split()
@@ -1208,6 +777,174 @@ class KTGGFunctions:
         with open("message.json", "w") as outfile:
             json.dump(messages, outfile)
 
+    def text_common_add_edit_account(self,
+                                     message: Message,
+                                     code_type: str,
+                                     user_action: UserAction):
+        self.delete_user_last_message(message=message)
+        email = message.text
+        if changePass.valid_mail(email):
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_ACCOUNT_CONFIRM_CODE.format(email=email),
+                reply_markup=Keypads.CANCEL
+            )
+
+            code = randint(10 ** 6, 10 ** 8)
+            self.ms_teams.mail_send(to_user_email=email, code=code)
+            self.db_user.add_user_email_code(
+                telegram_id=message.chat.id,
+                confirm_code=code,
+                email=email,
+                code_type=code_type,
+            )
+
+            self.db_user.update_user_action(
+                telegram_id=message.chat.id,
+                action=user_action.name,
+            )
+        else:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_ACCOUNT_WRONG_MAIL,
+                reply_markup=Keypads.CANCEL
+            )
+
+    def text_add_edit_email_account(self, message: Message):
+        self.text_common_add_edit_account(
+            message=message,
+            code_type="email",
+            user_action=UserAction.email_confirm_code,
+        )
+
+    def text_add_edit_email_account_work(self, message: Message):
+        self.text_common_add_edit_account(
+            message=message,
+            code_type="email",
+            user_action=UserAction.email_confirm_code_work,
+        )
+
+    def text_add_edit_teams_account(self, message: Message):
+        for domain in Domains:
+            if domain.value in message.text:
+                self.text_common_add_edit_account(
+                    message=message,
+                    code_type="teams",
+                    user_action=UserAction.teams_confirm_code,
+                )
+                return
+        self.bot.send_message(
+            chat_id=message.chat.id,
+            text=MessagesText.USER_ACCOUNT_WRONG_TEAMS,
+        )
+
+    def text_add_edit_teams_account_work(self, message: Message):
+        for domain in Domains:
+            if domain.value in message.text:
+                self.text_common_add_edit_account(
+                    message=message,
+                    code_type="teams",
+                    user_action=UserAction.teams_confirm_code_work,
+                )
+                return
+        self.bot.send_message(
+            chat_id=message.chat.id,
+            text=MessagesText.USER_ACCOUNT_WRONG_TEAMS,
+        )
+
+    def text_common_confirm_code_account(self,
+                                         message: Message,
+                                         code_type: str,
+                                         command):
+        self.delete_user_last_message(message=message)
+        confirm_code = message.text
+
+        if int(confirm_code) == self.db_user.get_user_confirm_code(telegram_id=message.chat.id,
+                                                                   code_type=code_type):
+            email = self.db_user.get_user_email_confirm_codes(telegram_id=message.chat.id,
+                                                              code_type=code_type)
+
+            if code_type == "email":
+                command(
+                    telegram_id=message.chat.id,
+                    mail=email,
+                )
+            else:
+                user_name = self.ms_teams.get_user_data(user_mail=email)
+                command(
+                    telegram_id=message.chat.id,
+                    user_name=user_name,
+                    mail=email,
+                )
+
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_ACCOUNT_EMAIL_CONFIRM,
+                reply_markup=Keypads.REMOVE,
+            )
+
+            self.db_user.delete_user_confirm_code(
+                telegram_id=message.chat.id,
+                code_type=code_type,
+            )
+
+            if command == self.db_user.update_user_email_main_account or command == self.db_user.update_user_teams_main_account:
+                self.my_account(message)
+            else:
+                self.work_account(message)
+
+        else:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_ACCOUNT_WRONG_CONFIRM_CODE,
+                reply_markup=Keypads.CANCEL,
+            )
+
+    def text_email_confirm_code(self, message: Message):
+        self.text_common_confirm_code_account(message=message,
+                                              code_type="email",
+                                              command=self.db_user.update_user_email_main_account)
+
+    def text_teams_confirm_code(self, message: Message):
+        self.text_common_confirm_code_account(message=message,
+                                              code_type="teams",
+                                              command=self.db_user.update_user_teams_main_account)
+
+    def text_email_confirm_code_work(self, message: Message):
+        self.text_common_confirm_code_account(message=message,
+                                              code_type="email",
+                                              command=self.db_user.update_user_email_work_account)
+
+    def text_teams_confirm_code_work(self, message: Message):
+        self.text_common_confirm_code_account(message=message,
+                                              code_type="teams",
+                                              command=self.db_user.update_user_teams_work_account)
+
+    def text_verify_work_account(self, message: Message):
+        code, user_name, user_lastname, user_thirdname = message.text.split()
+        if changePass.get_work_account_by_codes(
+            code=code,
+            user_name=user_name,
+            user_lastname=user_lastname,
+            user_thirdname=user_thirdname,
+        ):
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_ACCOUNT_WORK_CONFIRM,
+            )
+            self.db_user.add_data_work_account(
+                telegram_id=message.chat.id,
+                username=message.chat.username,
+            )
+
+            self._remove_keyboard(message)
+            self.work_account(message)
+        else:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_ACCOUNT_WORK_WRONG,
+            )
+
     def text_cancel_message(self, message: Message):
         self.db_user.update_user_action(
             telegram_id=message.chat.id,
@@ -1228,3 +965,15 @@ class KTGGFunctions:
             chat_id=msg.chat.id,
             message_id=msg.id,
         )
+
+    def _generate_additional_data_message_to_admin(self,
+                                                   telegram_id: int,
+                                                   sent_from: SentFrom) -> Union[str, None]:
+        if sent_from == SentFrom.main_menu:
+            return None
+        elif sent_from == SentFrom.user_account:
+            response = self.db_user.get_user_data_main_account(telegram_id=telegram_id)
+        else:
+            response = self.db_user.get_user_data_work_account(telegram_id=telegram_id)
+
+        return f"\n ---Email: {response['email']} \n---UserName: {response['userName']} \n---MSTeams: {response['teamsEmail']}"

@@ -102,6 +102,13 @@ def get_username_by_passport(user_name: str,
     return user_name
 
 
+def get_work_account_by_codes(code: str, user_name: str, user_lastname: str, user_thirdname: str):
+    work_base = json.load(codecs.open("teacher.json", 'r', 'utf-8-sig'))
+    template = {"ID працівника": code, "ПІБ": f"{user_name} {user_lastname} {user_thirdname}"}
+
+    return template in work_base
+
+
 class MicrosoftTeamsFunctions:
     logger = get_logger()
 
@@ -196,6 +203,27 @@ class MicrosoftTeamsFunctions:
             return self.reset_password(user_id=user_id)
         return False
 
+    def mail_send(self, to_user_email: str, code: int) -> None:
+        user_id = key.get_reply_mail()
+        endpoint = f"https://graph.microsoft.com/v1.0/users/{user_id}/sendMail"
+
+        email_msg = {
+            "Message":
+                {"Subject": "Verify code KTGG Bot",
+                 "Body":
+                     {
+                         "ContentType": "Text",
+                         "Content": f"Твій код підтвердження: {code}. Нікому не розголошуйте його, якщо ти не реєструєш акаунт в боті ігноруй це повідомлення"},
+                 "ToRecipients": [{"EmailAddress": {"Address": to_user_email}}]
+                 },
+            "SaveToSentItems": "true"}
+        r = requests.post(endpoint,
+                          headers=self.headers, json=email_msg)
+        if r.ok:
+            self.logger.info(f"Sent message to {to_user_email}")
+        else:
+            self.logger.info(f"Fail to send message{r.json()}")
+
     def detete_user(self, name, lastname):
         # graph
         headers = {
@@ -231,27 +259,6 @@ class MicrosoftTeamsFunctions:
             print(response.json())
             return False, "", ""
 
-    def mail_send(self, to_user_email, code):
-        user_id = key.get_reply_mail()
-        endpoint = f'https://graph.microsoft.com/v1.0/users/{user_id}/sendMail'
-
-        email_msg = {
-            'Message':
-                {'Subject': "Verify code KTGG Bot",
-                 'Body':
-                     {
-                         'ContentType': 'Text',
-                         'Content': f"Ваш код підтвердження: {code}. Нікому не розголошуйте його, якщо Ви не реєструєте акаунт в боті ігноруйте це повідомлення"},
-                 'ToRecipients': [{'EmailAddress': {'Address': to_user_email}}]
-                 },
-            'SaveToSentItems': 'true'}
-        r = requests.post(endpoint,
-                          headers={'Authorization': 'Bearer ' + self.authenticate}, json=email_msg)
-        if r.ok:
-            print('Sent email successfully')
-        else:
-            print(r.json())
-
     def valid_teams(self, user_mail):
         headers = {
             'Content-Type': 'application/json',
@@ -275,11 +282,4 @@ class MicrosoftTeamsFunctions:
         result = requests.get(
             f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=headers).json()
 
-        user_data = [result['givenName'], result['surname']]
-
-        if result['jobTitle'] != 'Викладач':
-            user_data.append('Студент')
-        else:
-            user_data.append('Викладач')
-
-        return user_data
+        return f"{result['givenName']} {result['surname']}"
