@@ -29,6 +29,7 @@ class UserAction(enum.Enum):
     admin_send_message = enum.auto()
     admin_change_status = enum.auto()
     admin_black_list = enum.auto()
+    admin_danger_zone = enum.auto()
     admin_logout = enum.auto()
     admin_tasks_list = enum.auto()
     admin_tasks_status = enum.auto()

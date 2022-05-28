@@ -2,6 +2,7 @@ class Dbs:
     admin = "base.admins"
     system = "base.system"
     confirm_codes = "base.confirm_codes"
+    messages = "base.messages"
 
 
 class MainDbs:

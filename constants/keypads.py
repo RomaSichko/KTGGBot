@@ -1,6 +1,6 @@
 from telebot import types
 
-from KTGGBot.constants.user_actions import UserAction
+from .user_actions import UserAction
 
 
 class Keypads:
@@ -49,12 +49,20 @@ class Keypads:
             types.InlineKeyboardButton("Додати ел. пошту", callback_data=UserAction.add_email_account.name),
             types.InlineKeyboardButton("Додати MS Teams", callback_data=UserAction.add_teams_account.name)
         ],
+        [
+            types.InlineKeyboardButton("Написати адміністратору",
+                                       callback_data=UserAction.message_to_admin_account.name)
+        ],
     ])
 
     ACCOUNT_MENU_WITH_MAIL = types.InlineKeyboardMarkup([
         [
             types.InlineKeyboardButton("Змінити ел. пошту", callback_data=UserAction.edit_email_account.name),
             types.InlineKeyboardButton("Додати MS Teams", callback_data=UserAction.add_teams_account.name)
+        ],
+        [
+            types.InlineKeyboardButton("Написати адміністратору",
+                                       callback_data=UserAction.message_to_admin_account.name)
         ],
     ])
 
@@ -93,7 +101,14 @@ class Keypads:
             types.InlineKeyboardButton("Додати MS Teams", callback_data=UserAction.add_teams_account_work.name),
         ],
         [
-            types.InlineKeyboardButton("Задачі", callback_data=UserAction.task_account_work.name),
+            types.InlineKeyboardButton("Повідомлення адміністратору (Teams)",
+                                       callback_data=UserAction.message_teams_to_admin_work.name),
+            types.InlineKeyboardButton("Задачі",
+                                       callback_data=UserAction.task_account_work.name),
+        ],
+        [
+            types.InlineKeyboardButton("Повідомлення адміністратору (інше)",
+                                       callback_data=UserAction.message_other_to_admin_work.name),
         ],
     ])
 
@@ -143,7 +158,7 @@ class Keypads:
         ],
         [
             types.InlineKeyboardButton("Чорний список", callback_data=UserAction.admin_black_list.name),
-            types.InlineKeyboardButton("Покинути панель", callback_data=UserAction.admin_logout.name)
+            types.InlineKeyboardButton("Небезпечна зона", callback_data=UserAction.admin_danger_zone.name)
         ]
     ])
 
@@ -167,12 +182,8 @@ class Keypads:
             types.InlineKeyboardButton("Реєстрація користувачів (.csv)", callback_data=UserAction.admin_add_edbo_account.name),
         ],
         [
-            types.InlineKeyboardButton("Формування груп (.json)", callback_data=UserAction.admin_new_groups.name),
             types.InlineKeyboardButton("Новий навчальний рік", callback_data=UserAction.admin_new_year.name),
         ],
-        [
-            types.InlineKeyboardButton("Покинути панель", callback_data=UserAction.admin_logout.name),
-        ]
     ])
 
     ADMIN_BLACK_LIST_MENU = types.InlineKeyboardMarkup([

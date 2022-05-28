@@ -1,6 +1,6 @@
 import re
 import sys
-from typing import Union, List, Tuple, Optional
+from typing import Union, Tuple, Optional
 
 import requests
 import json
@@ -12,7 +12,7 @@ import codecs
 import cv2
 from pyzbar.pyzbar import decode
 import key
-from KTGGBot.constants.dbs import JsonConstants, DocumentType
+from constants.dbs import JsonConstants, DocumentType
 
 
 def get_logger():
@@ -52,9 +52,9 @@ def generate_password():
     upper = string.ascii_uppercase
     lower = string.ascii_lowercase
     digits = string.digits
-    password = [*[random.choice(upper) for _ in range(random.randint(1, 4))],
-                *[random.choice(lower) for _ in range(random.randint(4, 8))],
-                *[random.choice(digits) for _ in range(random.randint(4, 8))]]
+    password = [*[random.choice(upper) for _ in range(random.randint(1, 3))],
+                *[random.choice(lower) for _ in range(random.randint(4, 5))],
+                *[random.choice(digits) for _ in range(random.randint(4, 5))]]
 
     return ''.join(password)
 
@@ -224,40 +224,29 @@ class MicrosoftTeamsFunctions:
         else:
             self.logger.info(f"Fail to send message{r.json()}")
 
-    def detete_user(self, name, lastname):
-        # graph
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + self.authenticate,
-        }
-
-        result = requests.get(
-            f'https://graph.microsoft.com/beta/users/', headers=headers).json()
-
-        user_name = name + ' ' + lastname
-
-        user_id = ''
-
-        while "@odata.nextLink" in result:
-            i = 0
-            while len(result["value"]) != i:
-                if user_name == result["value"][i]["displayName"]:
-                    user_id = result["value"][i]["userPrincipalName"]
-                i += 1
-
+    def delete_user(self,
+                    user_id: str = None,
+                    user_name: str = None) -> bool:
+        """Delete user from MS Teams platform"""
+        if not user_id:
             result = requests.get(
-                result["@odata.nextLink"], headers=headers).json()
+                f'https://graph.microsoft.com/beta/users/', headers=self.headers).json()
+
+            while "@odata.nextLink" in result:
+                for current in result["value"]:
+                    if user_name == current["displayName"]:
+                        user_id = current["userPrincipalName"]
+
+                result = requests.get(
+                    result["@odata.nextLink"], headers=self.headers).json()
 
         response = requests.delete(
             f'https://graph.microsoft.com/beta/users/{user_id}', headers=self.headers)
-
-        if str(response.status_code)[0] == '2':
-            print(f'Success! {response.status_code}')
-            return True, user_id, user_name
-        else:
-            print(response.status_code)
-            print(response.json())
-            return False, "", ""
+        if response.status_code // 100 == 2:
+            self.logger.info(msg=f"Deleted user {user_id}")
+            return True
+        self.logger.info(msg=f"User {user_id} not found")
+        return False
 
     def valid_teams(self, user_mail):
         headers = {

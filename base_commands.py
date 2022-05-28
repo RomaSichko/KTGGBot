@@ -3,29 +3,16 @@ from typing import Any, Type, List, Union
 
 import requests
 
-import changePass
+import utils
 import key
-from KTGGBot.constants.dbs import MainDbs, Dbs
-
-db_schema = {
-    "id": "auto",
-    "email": str,
-    "teamsMail": str,
-    "telegramID": int,
-    "telegramNickname": str,
-    "userName": str,
-    "userRole": str,
-    "validMail": bool,
-    "validTeams": bool,
-    "memeees": bool,
-}
+from constants.dbs import MainDbs, Dbs
 
 
 class DbExecutor:
     sql_template = "\n    \"operation\": \"sql\",\n    \"sql\": \"{sql_request}\"\n"
     db_type: MainDbs = None
 
-    logger = changePass.get_logger()
+    logger = utils.get_logger()
 
     def send_request(self, payload: str) -> Any:
         """Send POST request with custom payload"""
@@ -290,8 +277,69 @@ class DbExecutor:
     def delete_user_confirm_code(self,
                                  telegram_id: int,
                                  code_type: str) -> None:
+        """Delete confirm code from db"""
         payload = self.sql_template.format(
             sql_request=f"DELETE FROM {Dbs.confirm_codes} WHERE telegramId = {telegram_id} AND codeType = \'{code_type}\'",
         )
+        self.send_request(payload)
 
+    def add_message_to_db(self,
+                          telegram_id: int,
+                          telegram_username: str,
+                          message: str,
+                          topic: str,
+                          additional_data: str,
+                          sent_from: str,
+                          time: str,
+                          main_id_message: int,
+                          ) -> None:
+        """Insert user message in db"""
+        payload = self.sql_template.format(
+            sql_request=
+            f"INSERT INTO {Dbs.messages} "
+            f"(additionalData, mainIdMessage, message, sentFrom, topic, username, time, userId, status) "
+            f"VALUE (\'{additional_data}\', {main_id_message}, \'{message}\', \'{sent_from}\',"
+            f"\'{topic}\', \'{telegram_username}\', \'{time}\', {telegram_id}, false)"
+        )
+        self.send_request(payload)
+
+    def get_message_from_db(self,
+                            filters: str = None) -> List:
+        """
+        Returns list of messages by filters
+        :param filters: str like telegramId = 123456 AND topic = \'None\'
+        :return: list of messages
+        """
+        if filters is None:
+            filters = "status = false"
+
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM {Dbs.messages} WHERE {filters}",
+        )
+
+        return self.send_request(payload)
+
+    def get_last_message_id(self) -> int:
+        """Returns last message id"""
+        payload = self.sql_template.format(
+            sql_request=f"SELECT MAX(mainIdMessage) AS main_id FROM {Dbs.messages}",
+        )
+        response = self.send_request(payload)[0]
+        return response["main_id"] if response else 0
+
+    def update_message(self,
+                       main_id_message: int,
+                       filters: str = None,
+                       set_data: str = None,
+                       ) -> None:
+        """Update message data"""
+        if filters is None:
+            filters = f"mainIdMessage = {main_id_message}"
+
+        if set_data is None:
+            set_data = "status = true"
+
+        payload = self.sql_template.format(
+            sql_request=f"UPDATE {Dbs.messages} SET {set_data} WHERE {filters}",
+        )
         self.send_request(payload)

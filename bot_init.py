@@ -1,32 +1,31 @@
 import datetime
 from random import randint
-from typing import Union
+from typing import Union, List
 
 import telebot
 from telebot.types import Message
 
-import changePass
+import utils
 import os
 import codecs
 import json
 import base_commands
-from KTGGBot.constants.dbs import TestDbs, MainDbs
-from KTGGBot.constants.domains import Domains
-from KTGGBot.constants.keypads import Keypads
-from KTGGBot.constants.messages import MessagesText
-from KTGGBot.constants.user_actions import UserAction, AdminRights, SentFrom
+from constants.dbs import TestDbs, MainDbs
+from constants.domains import Domains
+from constants.keypads import Keypads
+from constants.messages import MessagesText
+from constants.user_actions import UserAction, AdminRights, SentFrom
 
 
 class KTGGFunctions:
 
     def __init__(self, bot: telebot.TeleBot):
         self.bot = bot
-        self.ms_teams = changePass.MicrosoftTeamsFunctions()
+        self.ms_teams = utils.MicrosoftTeamsFunctions()
         self.db_user = base_commands.DbExecutor()
         self.db_user.db_type = TestDbs if self.db_user.current_db() == "test" else MainDbs
 
-        self.mainIDMessage = json.load(codecs.open(
-            "message.json", 'r', 'utf-8-sig'))[-1]['mainIDMessage'] + 1
+        self.main_id_message = self.db_user.get_last_message_id() + 1
 
     def switch_db(self, message):
         db = message.text.split()[1]
@@ -223,32 +222,33 @@ class KTGGFunctions:
 
     def callback_worker(self, call):
         new_calls = {
-            UserAction.main_rules.name: self.main_rules_show,
-            UserAction.main_faq.name: self.main_faq_show,
-            UserAction.reset_password_without_account.name: self.reset_password_choice_verify_type,
-            UserAction.show_admin_online.name: self.admins_online_show,
-            UserAction.message_to_admin.name: self.message_to_admin_call,
-            UserAction.back_main_menu.name: self.back_to_main_menu,
-            UserAction.verify_student_ticket.name: self.verify_type_student_ticket,
-            UserAction.verify_id_card.name: self.verify_type_id_card,
-            UserAction.edit_email_account.name: self.edit_email_personal_account,
-            UserAction.edit_teams_account.name: self.edit_teams_personal_account,
-            UserAction.reset_password_account.name: self.reset_password_account,
-            UserAction.reset_password_account_work.name: self.reset_password_account_work,
-            UserAction.message_to_admin_account.name: self.message_to_admin_account,
-            UserAction.add_email_account.name: self.add_email_personal_account,
-            UserAction.add_teams_account.name: self.add_teams_personal_account,
-            UserAction.edit_email_account_work.name: self.edit_email_work_account,
-            UserAction.edit_teams_account_work.name: self.edit_teams_work_account,
-            UserAction.task_account_work.name: self.edit_data_work_account,
-            UserAction.message_teams_to_admin_work.name: self.message_to_admin_work_account,
-            UserAction.message_other_to_admin_work.name: self.message_other_to_admin_work_account,
-            UserAction.add_email_account_work.name: self.add_email_work_account,
-            UserAction.add_teams_account_work.name: self.add_teams_work_account,
+            UserAction.main_rules.name: self.call_main_rules_show,
+            UserAction.main_faq.name: self.call_main_faq_show,
+            UserAction.reset_password_without_account.name: self.call_reset_password_choice_verify_type,
+            UserAction.show_admin_online.name: self.call_admins_online_show,
+            UserAction.message_to_admin.name: self.call_message_to_admin_call,
+            UserAction.back_main_menu.name: self.call_back_to_main_menu,
+            UserAction.verify_student_ticket.name: self.call_verify_type_student_ticket,
+            UserAction.verify_id_card.name: self.call_verify_type_id_card,
+            UserAction.edit_email_account.name: self.call_edit_email_personal_account,
+            UserAction.edit_teams_account.name: self.call_edit_teams_personal_account,
+            UserAction.reset_password_account.name: self.call_reset_password_account,
+            UserAction.reset_password_account_work.name: self.call_reset_password_account_work,
+            UserAction.message_to_admin_account.name: self.call_message_to_admin_account,
+            UserAction.add_email_account.name: self.call_add_email_personal_account,
+            UserAction.add_teams_account.name: self.call_add_teams_personal_account,
+            UserAction.edit_email_account_work.name: self.call_edit_email_work_account,
+            UserAction.edit_teams_account_work.name: self.call_edit_teams_work_account,
+            UserAction.task_account_work.name: self.call_edit_data_work_account,
+            UserAction.message_teams_to_admin_work.name: self.call_message_to_admin_work_account,
+            UserAction.message_other_to_admin_work.name: self.call_message_other_to_admin_work_account,
+            UserAction.add_email_account_work.name: self.call_add_email_work_account,
+            UserAction.add_teams_account_work.name: self.call_add_teams_work_account,
 
-            UserAction.admin_reset_pass_id.name: self.admin_reset_password_by_id,
-            UserAction.admin_reset_pass_pib.name: self.admin_reset_password_by_pib,
-            UserAction.admin_send_message.name: self.admin_send_message,
+            UserAction.admin_danger_zone.name: self.call_admin_danger_zone,
+            UserAction.admin_reset_pass_id.name: self.call_admin_reset_password_by_id,
+            UserAction.admin_reset_pass_pib.name: self.call_admin_reset_password_by_pib,
+            UserAction.admin_send_message.name: self.call_admin_send_message,
             # UserAction.admin_change_status
             # UserAction.admin_black_list
             # UserAction.admin_logout
@@ -256,7 +256,7 @@ class KTGGFunctions:
             # UserAction.admin_tasks_status
             # UserAction.admin_worker_edit
             # UserAction.admin_tasks_questions
-            # UserAction.admin_delete_account
+            UserAction.admin_delete_account.name: self.call_admin_delete_account,
             # UserAction.admin_add_edbo_account
             # UserAction.admin_new_groups
             # UserAction.admin_new_year
@@ -271,24 +271,9 @@ class KTGGFunctions:
             # UserAction.task_executor_2
             # UserAction.task_executor_3
             # UserAction.task_executor_4
-            UserAction.mark_answered.name: self.admin_mark_answered,
+            UserAction.mark_answered.name: self.call_admin_mark_answered,
         }
         new_calls[call.data](call)
-
-    def add_user_to_black_list_admin(self, message):
-        pass
-
-    @staticmethod
-    def to_black_list(user_id, reason):
-        black_list = json.load(codecs.open("black_list.json", 'r', 'utf-8-sig'))
-
-        black_list.append({
-            "id": user_id,
-            "reason": reason,
-        })
-
-        with open("message.json", "w") as outfile:
-            json.dump(black_list, outfile)
 
     def delete_user_last_message(self, message):
         self.bot.delete_message(
@@ -296,28 +281,29 @@ class KTGGFunctions:
             message_id=message.id,
         )
 
-    def main_rules_show(self, call):
+    def call_main_rules_show(self, call):
         self._edit_message_call(
             text=MessagesText.MAIN_RULES,
             reply_markup=Keypads.BACK_TO_MAIN_MENU,
             call=call,
         )
 
-    def main_faq_show(self, call):
+    def call_main_faq_show(self, call):
         self._edit_message_call(
             text=MessagesText.MAIN_FAQ,
             reply_markup=Keypads.BACK_TO_MAIN_MENU,
             call=call
         )
 
-    def reset_password_choice_verify_type(self, call):
+    def call_reset_password_choice_verify_type(self, call):
         self._edit_message_call(
             text=MessagesText.RESET_PASSWORD_WITHOUT_ACC_CHOICE_VERIFY_TYPE,
             reply_markup=Keypads.TYPE_OF_RESET,
             call=call,
         )
 
-    def admins_online_show(self, call):
+    def call_admins_online_show(self, call):
+        # DEPRECATED
         admin_status_template = "\t{name} {status}\n"
         message_text = "Статуси:\n\t🔴 - зайнятий\n\t🟠 - не активний\n\t🟡 - на парі\n\t🟢 - вільний\nАдміни:\n"
 
@@ -333,72 +319,72 @@ class KTGGFunctions:
             call=call
         )
 
-    def message_to_admin_call(self, call):
+    def call_message_to_admin_call(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_TO_ADMIN,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def back_to_main_menu(self, call):
+    def call_back_to_main_menu(self, call):
         self._edit_message_call(
             text=MessagesText.MENU_MESSAGES,
             reply_markup=Keypads.MAIN_MENU,
             call=call
         )
 
-    def verify_type_student_ticket(self, call):
+    def call_verify_type_student_ticket(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_STUDENT_TICKET_RESET_TYPE,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def verify_type_id_card(self, call):
+    def call_verify_type_id_card(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_ID_CARD_RESET_TYPE,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def edit_email_personal_account(self, call):
-        self.edit_email_account(call=call)
+    def call_edit_email_personal_account(self, call):
+        self.call_edit_email_account(call=call)
 
-    def edit_teams_personal_account(self, call):
-        self.edit_teams_account(call=call)
+    def call_edit_teams_personal_account(self, call):
+        self.call_edit_teams_account(call=call)
 
-    def edit_email_work_account(self, call):
-        self.edit_email_account(call=call)
+    def call_edit_email_work_account(self, call):
+        self.call_edit_email_account(call=call)
 
-    def edit_teams_work_account(self, call):
-        self.edit_teams_account(call=call)
+    def call_edit_teams_work_account(self, call):
+        self.call_edit_teams_account(call=call)
 
-    def add_email_personal_account(self, call):
-        self.add_email_account(call=call)
+    def call_add_email_personal_account(self, call):
+        self.call_add_email_account(call=call)
 
-    def add_teams_personal_account(self, call):
-        self.add_teams_account(call=call)
+    def call_add_teams_personal_account(self, call):
+        self.call_add_teams_account(call=call)
 
-    def add_email_work_account(self, call):
-        self.add_email_account(call=call)
+    def call_add_email_work_account(self, call):
+        self.call_add_email_account(call=call)
 
-    def add_teams_work_account(self, call):
-        self.add_teams_account(call=call)
+    def call_add_teams_work_account(self, call):
+        self.call_add_teams_account(call=call)
 
-    def message_to_admin_account(self, call):
-        self.message_to_admin_call(call=call)
+    def call_message_to_admin_account(self, call):
+        self.call_message_to_admin_call(call=call)
 
-    def message_to_admin_work_account(self, call):
-        self.message_to_admin_call(call=call)
+    def call_message_to_admin_work_account(self, call):
+        self.call_message_to_admin_call(call=call)
 
-    def message_other_to_admin_work_account(self, call):
+    def call_message_other_to_admin_work_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_TO_ADMIN_NO_TEAMS,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def reset_password_account(self, call):
+    def call_reset_password_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_RESET_PASSWORD_ACCOUNT,
             reply_markup=Keypads.REMOVE,
@@ -423,7 +409,7 @@ class KTGGFunctions:
             )
             self.my_account(call.message)
 
-    def reset_password_account_work(self, call):
+    def call_reset_password_account_work(self, call):
         self._edit_message_call(
             text=MessagesText.MESSAGE_RESET_PASSWORD_ACCOUNT,
             reply_markup=Keypads.REMOVE,
@@ -448,7 +434,7 @@ class KTGGFunctions:
             )
             self.work_account(call.message)
 
-    def edit_data_work_account(self, call):
+    def call_edit_data_work_account(self, call):
         self._remove_old_message_send_message_call(
             text="Дана дія поки що недоступна",
             reply_markup=Keypads.CANCEL,
@@ -456,28 +442,28 @@ class KTGGFunctions:
         )
         self.work_account(call.message)
 
-    def add_email_account(self, call):
+    def call_add_email_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_ADD_EMAIL_ACCOUNT,
             reply_markup=Keypads.CANCEL,
             call=call
         )
 
-    def add_teams_account(self, call):
+    def call_add_teams_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_ADD_TEAMS_ACCOUNT,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def edit_email_account(self, call):
+    def call_edit_email_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_EDIT_EMAIL_ACCOUNT,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def edit_teams_account(self, call):
+    def call_edit_teams_account(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_EDIT_TEAMS_ACCOUNT,
             reply_markup=Keypads.CANCEL,
@@ -511,43 +497,42 @@ class KTGGFunctions:
             return True
         return False
 
-    def admin_reset_password_by_id(self, call):
+    def call_admin_reset_password_by_id(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.ADMIN_PANEL_RESET_PASSWORD_BY_ID,
             reply_markup=Keypads.CANCEL,
             call=call
         )
 
-    def admin_reset_password_by_pib(self, call):
+    def call_admin_reset_password_by_pib(self, call):
         self._remove_old_message_send_message_call(
             text=MessagesText.ADMIN_PANEL_RESET_PASSWORD_BY_PIB,
             reply_markup=Keypads.CANCEL,
             call=call
         )
 
-    def admin_send_message(self, call):
+    def call_admin_send_message(self, call):
         # TODO: refactor message text
         if self._get_admin_right(call.message.chat.id, AdminRights.answer_message):
-            messages = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
+            messages = self.db_user.get_message_from_db()
 
             for message in messages:
-                if not message['status']:
-                    self.bot.send_message(
-                        chat_id=call.message.chat.id,
-                        text=(f"mainIDMessage: {message['mainIDMessage']} \n"
-                              f"id: {message['id']} \n"
-                              f"username: {message['username']} \n"
-                              f"Message: {message['message']} \n"
-                              f"Topic: {message['topic']} \n"
-                              f"SentFrom: {message['sentFrom']}\n"
-                              f"Additional data: {message['additionalData']}\n"
-                              f"Time: {message['time']} \n"),
-                        reply_markup=Keypads.MARK_ANSWERED,
-                    )
+                self.bot.send_message(
+                    chat_id=call.message.chat.id,
+                    text=(f"mainIdMessage: {message['mainIdMessage']} \n"
+                          f"UserId: {message['userId']} \n"
+                          f"username: {message['username']} \n"
+                          f"Message: {message['message']} \n"
+                          f"Topic: {message['topic']} \n"
+                          f"SentFrom: {message['sentFrom']}\n"
+                          f"Additional data: {message['additionalData']}\n"
+                          f"Time: {message['time']} \n"),
+                    reply_markup=Keypads.MARK_ANSWERED,
+                )
 
             self.bot.send_message(
                 chat_id=call.message.chat.id,
-                text="mainIDMessage / ID user / message",
+                text=MessagesText.ADMIN_SEND_MESSAGE,
                 reply_markup=Keypads.CANCEL,
             )
             self.db_user.update_user_action(call.message.chat.id, call.data)
@@ -557,16 +542,26 @@ class KTGGFunctions:
                 text=MessagesText.ADMIN_PANEL_WITHOUT_RIGHTS,
             )
 
-    def admin_mark_answered(self, call):
-        messages = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
-        for message in messages:
-            if message['mainIDMessage'] == int(call.message.text.split()[1]):
-                message["status"] = True
-
-        with open("message.json", "w") as outfile:
-            json.dump(messages, outfile)
+    def call_admin_mark_answered(self, call):
+        self.db_user.update_message(
+            main_id_message=int(call.message.text.split()[1]),
+        )
 
         self.delete_user_last_message(message=call.message)
+
+    def call_admin_delete_account(self, call):
+        self._remove_old_message_send_message_call(
+            text=MessagesText.ADMIN_DELETE_ACCOUNTS,
+            reply_markup=Keypads.CANCEL,
+            call=call,
+        )
+
+    def call_admin_danger_zone(self, call):
+        self._edit_message_call(
+            text=MessagesText.ADMIN_PANEL_DANGER,
+            call=call,
+            reply_markup=Keypads.ADMIN_DANGER_MENU,
+        )
 
     def text_handler(self, message: Message):
         if message.text == "Відмінити":
@@ -600,7 +595,7 @@ class KTGGFunctions:
             # UserAction.admin_black_list
             # UserAction.admin_worker_edit
             # UserAction.admin_tasks_questions
-            # UserAction.admin_delete_account
+            UserAction.admin_delete_account.name: self.text_delete_user,
             # UserAction.admin_add_edbo_account
             # UserAction.admin_new_groups
             # UserAction.admin_new_year
@@ -614,7 +609,13 @@ class KTGGFunctions:
         action = self.db_user.get_user_action(
             telegram_id=message.chat.id,
         )
-        message_handle[action](message=message)
+        try:
+            message_handle[action](message=message)
+        except KeyError:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.UNKNOWN_ACTION,
+            )
 
     def text_common_message_to_admin(self, message: Message, sent_from: SentFrom):
         message_topics = {
@@ -623,28 +624,20 @@ class KTGGFunctions:
             SentFrom.work_account: "Проблема працівника (Teams)",
             SentFrom.work_account_other: "Проблема працівника (Інше)"
         }
-        message_template = {
-            "mainIDMessage": self.mainIDMessage,
-            "admin": None,
-            "answer": None,
-            "id": message.chat.id,
-            "message": message.text,
-            "status": False,
-            "username": message.chat.username,
-            "topic": message_topics[sent_from],
-            "sentFrom": sent_from.name,
-            "additionalData": self._generate_additional_data_message_to_admin(
+
+        self.db_user.add_message_to_db(
+            telegram_id=message.chat.id,
+            telegram_username=message.chat.username,
+            main_id_message=self.main_id_message,
+            message=message.text,
+            topic=message_topics[sent_from],
+            sent_from=sent_from.name,
+            additional_data=self._generate_additional_data_message_to_admin(
                 telegram_id=message.chat.id,
                 sent_from=sent_from,
             ),
-            "time": datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"),
-        }
-
-        messages = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
-        messages.append(message_template)
-
-        with open("message.json", "w") as outfile:
-            json.dump(messages, outfile)
+            time=datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"),
+        )
 
         self.bot.send_message(
             chat_id=message.chat.id,
@@ -652,7 +645,7 @@ class KTGGFunctions:
             reply_markup=Keypads.REMOVE,
         )
 
-        self.mainIDMessage += 1
+        self.main_id_message += 1
         self.main_menu(message)
 
     def test_message_to_admin_main_menu(self, message: Message):
@@ -707,7 +700,7 @@ class KTGGFunctions:
     def text_admin_reset_pass_id(self, message: Message):
         # TODO: refactor
         user_id = message.text
-        if changePass.valid_mail(user_id):
+        if utils.valid_mail(user_id):
             response = self.ms_teams.reset_password(user_id=user_id)
             if response:
                 self.bot.send_message(
@@ -748,34 +741,72 @@ class KTGGFunctions:
             )
 
     def text_admin_send_message(self, message: Message):
-        messages = json.load(codecs.open("message.json", 'r', 'utf-8-sig'))
-        message_id, chat_id, *admin_answer = message.text.split()
+        if message.reply_to_message:
+            split_message = message.reply_to_message.text.split()
+            if "mainIdMessage:" not in split_message:
+                self.bot.send_message(
+                    chat_id=message.chat.id,
+                    text=MessagesText.WRONG_MESSAGE_CHOICE,
+                )
+                return
+            message_id, chat_id = int(split_message[1]), split_message[3]
 
-        for mess in messages:
-            if (mess['mainIDMessage'] == int(message_id)
-                    and mess['id'] == int(chat_id)):
-                if not mess['status']:
+            admin_answer = message.text
+
+            message_db = self.db_user.get_message_from_db(
+                filters=f"mainIdMessage = {message_id}",
+            )
+
+            if message_db:
+                if not message_db[0]["status"]:
                     self.bot.send_message(
                         chat_id=int(chat_id),
                         text=MessagesText.ADMIN_MESSAGE_ANSWER.format(
-                            answer=" ".join(admin_answer),
+                            answer=admin_answer,
                         ))
                     self.bot.send_message(
                         chat_id=message.chat.id,
                         text=MessagesText.ADMIN_MESSAGE_SENT,
                     )
-
-                    mess['status'] = True
-                    mess['answer'] = " ".join(admin_answer),
-                    mess['admin'] = message.chat.id
+                    self.db_user.update_message(
+                        main_id_message=message_id,
+                        set_data=f"status = true, admin = {message.chat.id}, answer = \'{admin_answer}\'"
+                    )
                 else:
                     self.bot.send_message(
                         chat_id=message.chat.id,
                         text=MessagesText.ADMIN_MESSAGE_ANSWERED,
                     )
+        else:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.WRONG_ADMIN_MESSAGE_REPLY,
+            )
 
-        with open("message.json", "w") as outfile:
-            json.dump(messages, outfile)
+    def text_delete_user(self, message: Message):
+        message_text = message.text.split()
+
+        if len(message_text) == 1:
+            verify_action = self.ms_teams.delete_user(
+                user_id=message.text,
+            )
+        elif len(message_text) == 2:
+            verify_action = self.ms_teams.delete_user(
+                user_name=message.text,
+            )
+        else:
+            self.bot.reply_to(
+                message=message,
+                text=MessagesText.WRONG_USER_DATA,
+            )
+            return
+        text = MessagesText.SUCCESS_DELETE_USER if (
+            verify_action) else MessagesText.FAILED_DELETE_USER
+
+        self.bot.reply_to(
+            message=message,
+            text=text.format(name=message.text)
+        )
 
     def text_common_add_edit_account(self,
                                      message: Message,
@@ -783,7 +814,7 @@ class KTGGFunctions:
                                      user_action: UserAction):
         self.delete_user_last_message(message=message)
         email = message.text
-        if changePass.valid_mail(email):
+        if utils.valid_mail(email):
             self.bot.send_message(
                 chat_id=message.chat.id,
                 text=MessagesText.USER_ACCOUNT_CONFIRM_CODE.format(email=email),
@@ -922,7 +953,7 @@ class KTGGFunctions:
 
     def text_verify_work_account(self, message: Message):
         code, user_name, user_lastname, user_thirdname = message.text.split()
-        if changePass.get_work_account_by_codes(
+        if utils.get_work_account_by_codes(
             code=code,
             user_name=user_name,
             user_lastname=user_lastname,
@@ -935,6 +966,11 @@ class KTGGFunctions:
             self.db_user.add_data_work_account(
                 telegram_id=message.chat.id,
                 username=message.chat.username,
+            )
+            self.db_user.update_user_teams_work_account(
+                telegram_id=message.chat.id,
+                user_name=f"{user_name} {user_lastname}",
+                mail=None,
             )
 
             self._remove_keyboard(message)
@@ -976,4 +1012,4 @@ class KTGGFunctions:
         else:
             response = self.db_user.get_user_data_work_account(telegram_id=telegram_id)
 
-        return f"\n ---Email: {response['email']} \n---UserName: {response['userName']} \n---MSTeams: {response['teamsEmail']}"
+        return f"email: {response['email']}, username: {response['userName']}, teams: {response['teamsEmail']}"
