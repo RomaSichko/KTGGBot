@@ -1,5 +1,5 @@
 import datetime
-from random import randint
+from random import randint, choice
 from typing import Union, List
 
 import telebot
@@ -29,6 +29,7 @@ class KTGGFunctions:
 
     def switch_db(self, message):
         db = message.text.split()[1]
+        # TODO: get permissions from db
         if message.chat.id == 684828985:
             if db == "test":
                 self.db_user.db_type = TestDbs
@@ -225,7 +226,6 @@ class KTGGFunctions:
             UserAction.main_rules.name: self.call_main_rules_show,
             UserAction.main_faq.name: self.call_main_faq_show,
             UserAction.reset_password_without_account.name: self.call_reset_password_choice_verify_type,
-            UserAction.show_admin_online.name: self.call_admins_online_show,
             UserAction.message_to_admin.name: self.call_message_to_admin_call,
             UserAction.back_main_menu.name: self.call_back_to_main_menu,
             UserAction.verify_student_ticket.name: self.call_verify_type_student_ticket,
@@ -249,7 +249,6 @@ class KTGGFunctions:
             UserAction.admin_reset_pass_id.name: self.call_admin_reset_password_by_id,
             UserAction.admin_reset_pass_pib.name: self.call_admin_reset_password_by_pib,
             UserAction.admin_send_message.name: self.call_admin_send_message,
-            # UserAction.admin_change_status
             # UserAction.admin_black_list
             # UserAction.admin_logout
             # UserAction.admin_tasks_list
@@ -259,7 +258,7 @@ class KTGGFunctions:
             UserAction.admin_delete_account.name: self.call_admin_delete_account,
             # UserAction.admin_add_edbo_account
             # UserAction.admin_new_groups
-            # UserAction.admin_new_year
+            UserAction.admin_delete_groups.name: self.call_delete_groups,
             # UserAction.admin_black_list_add
             # UserAction.admin_black_list_remove
             # UserAction.admin_back_main_menu
@@ -300,23 +299,6 @@ class KTGGFunctions:
             text=MessagesText.RESET_PASSWORD_WITHOUT_ACC_CHOICE_VERIFY_TYPE,
             reply_markup=Keypads.TYPE_OF_RESET,
             call=call,
-        )
-
-    def call_admins_online_show(self, call):
-        # DEPRECATED
-        admin_status_template = "\t{name} {status}\n"
-        message_text = "Статуси:\n\t🔴 - зайнятий\n\t🟠 - не активний\n\t🟡 - на парі\n\t🟢 - вільний\nАдміни:\n"
-
-        for admin in json.load(codecs.open("admin.json", 'r', 'utf-8-sig')):
-            message_text += admin_status_template.format(
-                name=admin["name"],
-                status=admin["status"],
-            )
-
-        self._edit_message_call(
-            text=message_text,
-            reply_markup=Keypads.BACK_TO_MAIN_MENU,
-            call=call
         )
 
     def call_message_to_admin_call(self, call):
@@ -557,11 +539,66 @@ class KTGGFunctions:
         )
 
     def call_admin_danger_zone(self, call):
-        self._edit_message_call(
-            text=MessagesText.ADMIN_PANEL_DANGER,
+        if self._get_admin_right(
+            user_id=call.message.chat.id,
+            right=AdminRights.danger_zone,
+        ):
+            self._remove_old_message_send_message_call(
+                text=MessagesText.ADMIN_PANEL_DANGER,
+                call=call,
+                reply_markup=Keypads.ADMIN_DANGER_MENU,
+            )
+        else:
+            self.bot.send_message(
+                chat_id=call.message.chat.id,
+                text=MessagesText.ADMIN_PANEL_DENIED,
+            )
+
+    def call_delete_groups(self, call):
+        self._remove_old_message_send_message_call(
             call=call,
-            reply_markup=Keypads.ADMIN_DANGER_MENU,
+            text=MessagesText.ADMIN_CALL_DELETE_GROUPS,
+            reply_markup=Keypads.CANCEL,
         )
+        self.sticker_send_random_sticker(call.message)
+
+    def sticker_send_random_sticker(self, message: Message):
+        sticker_set = utils.get_random_sticker_set()
+        sticker = choice(self.bot.get_sticker_set(name=sticker_set).stickers)
+        self.bot.send_sticker(
+            chat_id=message.chat.id,
+            sticker=sticker.file_id,
+        )
+
+    def verify_sticker(self, message: Message):
+        if (self.db_user.get_user_action(telegram_id=message.chat.id) ==
+                UserAction.admin_delete_groups.name):
+            if message.reply_to_message:
+                if message.reply_to_message.sticker.file_unique_id == message.sticker.file_unique_id:
+                    self.bot.send_message(
+                        chat_id=message.chat.id,
+                        text=MessagesText.ADMIN_STICKER_VERIFIED,
+                    )
+                    self.db_user.update_user_action(
+                        telegram_id=message.chat.id,
+                        action=UserAction.verify_remove_groups.name,
+                    )
+                else:
+                    self.bot.send_message(
+                        chat_id=message.chat.id,
+                        text=MessagesText.ADMIN_STICKER_FAILED,
+                    )
+                    self.sticker_send_random_sticker(message=message)
+            else:
+                self.bot.send_message(
+                    chat_id=message.chat.id,
+                    text=MessagesText.WRONG_ADMIN_STICKER,
+                )
+        else:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.NOT_CONFIRMED_ACTION,
+            )
 
     def text_handler(self, message: Message):
         if message.text == "Відмінити":
@@ -597,7 +634,7 @@ class KTGGFunctions:
             # UserAction.admin_tasks_questions
             UserAction.admin_delete_account.name: self.text_delete_user,
             # UserAction.admin_add_edbo_account
-            # UserAction.admin_new_groups
+            UserAction.verify_remove_groups.name: self.text_admin_delete_groups,
             # UserAction.admin_new_year
             # UserAction.admin_black_list_add
             # UserAction.admin_black_list_remove
@@ -808,6 +845,26 @@ class KTGGFunctions:
             text=text.format(name=message.text)
         )
 
+    def text_admin_delete_groups(self, message: Message):
+        ignored_groups = []
+        if message.text.lower() != "all":
+            ignored_groups = message.text.split(", ")
+        print(ignored_groups)
+        result = self.ms_teams.delete_all_groups(ignored_groups=ignored_groups)
+        if result:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.ADMIN_DELETE_GROUPS_ERRORS.format(
+                    groups=" ".join(result),
+                ),
+            )
+        else:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.ADMIN_DELETE_GROUPS_SUCCESS,
+            )
+        self.admin_panel(message=message)
+
     def text_common_add_edit_account(self,
                                      message: Message,
                                      code_type: str,
@@ -967,10 +1024,12 @@ class KTGGFunctions:
                 telegram_id=message.chat.id,
                 username=message.chat.username,
             )
+            email = self.ms_teams.get_user_id_by_name(name=f"{user_name} {user_lastname}")
+
             self.db_user.update_user_teams_work_account(
                 telegram_id=message.chat.id,
                 user_name=f"{user_name} {user_lastname}",
-                mail=None,
+                mail=email,
             )
 
             self._remove_keyboard(message)

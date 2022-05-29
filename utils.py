@@ -1,6 +1,6 @@
 import re
 import sys
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, List
 
 import requests
 import json
@@ -23,6 +23,16 @@ def get_logger():
     handler.setFormatter(logging.Formatter(fmt='[%(asctime)s: %(levelname)s] %(message)s'))
     logger.addHandler(handler)
     return logger
+
+
+def get_random_sticker_set():
+    set_names = [
+        "travelbook_ukraine", "WorryGreenFrog", "comics_memes", "Meow_by_mysticise", "codebark",
+        "TroyBeaver", "TheCurl", "LolAnimals2", "kocheng", "MrLittlePrince", "Sonic",
+        "KermitTheDog", "MrSeal", "BlueBird", "SnappyCrab", "MrSeagull", "CloudiaSheep", "Snail",
+        "KangarooFighter", "CyberGirl", "Tapir", "Minions", "Eggdog"]
+
+    return random.choice(set_names)
 
 
 def valid_mail(email: str):
@@ -162,13 +172,12 @@ class MicrosoftTeamsFunctions:
         result = requests.get(
             'https://graph.microsoft.com/beta/users/', headers=self.headers).json()
         user_id = ""
-        while "@odata.nextLink" in result:
-            i = 0
-
-            while len(result["value"]) != i:
-                if name == result["value"][i]["displayName"]:
-                    user_id = result["value"][i]["userPrincipalName"]
-                i += 1
+        while True:
+            for current in result["value"]:
+                if name == current["displayName"]:
+                    user_id = current["userPrincipalName"]
+            if "@odata.nextLink" not in result:
+                break
 
             result = requests.get(
                 result["@odata.nextLink"], headers=self.headers).json()
@@ -232,10 +241,12 @@ class MicrosoftTeamsFunctions:
             result = requests.get(
                 f'https://graph.microsoft.com/beta/users/', headers=self.headers).json()
 
-            while "@odata.nextLink" in result:
+            while True:
                 for current in result["value"]:
                     if user_name == current["displayName"]:
                         user_id = current["userPrincipalName"]
+                if "@odata.nextLink" not in result:
+                    break
 
                 result = requests.get(
                     result["@odata.nextLink"], headers=self.headers).json()
@@ -248,27 +259,48 @@ class MicrosoftTeamsFunctions:
         self.logger.info(msg=f"User {user_id} not found")
         return False
 
-    def valid_teams(self, user_mail):
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + self.authenticate,
-        }
-
-        result = requests.get(
-            f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=headers).json()
-
-        if 'error' in result:
-            return False
-        else:
-            return True
+    # def valid_teams(self, user_mail):
+    #     headers = {
+    #         'Content-Type': 'application/json',
+    #         'Authorization': 'Bearer ' + self.authenticate,
+    #     }
+    #
+    #     result = requests.get(
+    #         f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=headers).json()
+    #
+    #     if 'error' in result:
+    #         return False
+    #     else:
+    #         return True
 
     def get_user_data(self, user_mail):
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + self.authenticate,
-        }
-
         result = requests.get(
-            f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=headers).json()
+            f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=self.headers).json()
 
         return f"{result['givenName']} {result['surname']}"
+
+    def delete_all_groups(self, ignored_groups: List[str] = None) -> Union[List, None]:
+        result = requests.get(
+            f'https://graph.microsoft.com/v1.0/groups', headers=self.headers).json()
+        list_of_exception = []
+        while True:
+            for current in result["value"]:
+                if current["displayName"] not in ignored_groups:
+                    delete_group = requests.delete(
+                        url=f"https://graph.microsoft.com/v1.0/groups/{current['id']}",
+                        headers=self.headers,
+                    )
+
+                    if delete_group.status_code // 100 == 2:
+                        self.logger.info(msg=f"Deleted group {current['displayName']}")
+                    else:
+                        list_of_exception.append(current["displayName"])
+                        self.logger.info(msg=f"Group deleting failed {current['displayName']} ")
+
+            if "@odata.nextLink" not in result:
+                break
+            result = requests.get(
+                result["@odata.nextLink"], headers=self.headers).json()
+        if list_of_exception:
+            return list_of_exception
+        return None

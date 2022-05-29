@@ -11,7 +11,8 @@ class Keypads:
             types.InlineKeyboardButton("FAQ", callback_data=UserAction.main_faq.name)],
         [
             types.InlineKeyboardButton("Скинути пароль (Студенти)", callback_data=UserAction.reset_password_without_account.name),
-            types.InlineKeyboardButton("Адміністратори онлайн", callback_data=UserAction.show_admin_online.name)
+            # TODO: add selection_committee
+            # types.InlineKeyboardButton("Приймальна комісія", callback_data=UserAction.show_admin_online.name)
         ],
         [
             types.InlineKeyboardButton("Написати адміністратору", callback_data=UserAction.message_to_admin.name)
@@ -88,9 +89,9 @@ class Keypads:
             types.InlineKeyboardButton("Задачі", callback_data=UserAction.task_account_work.name),
         ],
         [
-            types.InlineKeyboardButton("Повідомлення адміністратору (Teams)",
+            types.InlineKeyboardButton("Повідомлення (Teams)",
                                        callback_data=UserAction.message_teams_to_admin_work.name),
-            types.InlineKeyboardButton("Повідомлення адміністратору (інше)",
+            types.InlineKeyboardButton("Повідомлення (інше)",
                                        callback_data=UserAction.message_other_to_admin_work.name),
         ],
     ])
@@ -101,13 +102,13 @@ class Keypads:
             types.InlineKeyboardButton("Додати MS Teams", callback_data=UserAction.add_teams_account_work.name),
         ],
         [
-            types.InlineKeyboardButton("Повідомлення адміністратору (Teams)",
+            types.InlineKeyboardButton("Повідомлення (Teams)",
                                        callback_data=UserAction.message_teams_to_admin_work.name),
             types.InlineKeyboardButton("Задачі",
                                        callback_data=UserAction.task_account_work.name),
         ],
         [
-            types.InlineKeyboardButton("Повідомлення адміністратору (інше)",
+            types.InlineKeyboardButton("Повідомлення (інше)",
                                        callback_data=UserAction.message_other_to_admin_work.name),
         ],
     ])
@@ -118,13 +119,13 @@ class Keypads:
             types.InlineKeyboardButton("Додати MS Teams", callback_data=UserAction.add_teams_account_work.name)
         ],
         [
-            types.InlineKeyboardButton("Повідомлення адміністратору (Teams)",
+            types.InlineKeyboardButton("Повідомлення (Teams)",
                                        callback_data=UserAction.message_teams_to_admin_work.name),
             types.InlineKeyboardButton("Задачі",
                                        callback_data=UserAction.task_account_work.name),
         ],
         [
-            types.InlineKeyboardButton("Повідомлення адміністратору (інше)",
+            types.InlineKeyboardButton("Повідомлення (інше)",
                                        callback_data=UserAction.message_other_to_admin_work.name),
         ],
     ])
@@ -139,9 +140,9 @@ class Keypads:
             types.InlineKeyboardButton("Задачі", callback_data=UserAction.task_account_work.name),
         ],
         [
-            types.InlineKeyboardButton("Повідомлення адміністратору (Teams)",
+            types.InlineKeyboardButton("Повідомлення (Teams)",
                                        callback_data=UserAction.message_teams_to_admin_work.name),
-            types.InlineKeyboardButton("Повідомлення адміністратору (інше)",
+            types.InlineKeyboardButton("Повідомлення (інше)",
                                        callback_data=UserAction.message_other_to_admin_work.name),
         ],
     ])
@@ -154,7 +155,6 @@ class Keypads:
         ],
         [
             types.InlineKeyboardButton("Відправити повідомлення", callback_data=UserAction.admin_send_message.name),
-            types.InlineKeyboardButton("Змінити статус", callback_data=UserAction.admin_change_status.name)
         ],
         [
             types.InlineKeyboardButton("Чорний список", callback_data=UserAction.admin_black_list.name),
@@ -179,10 +179,7 @@ class Keypads:
     ADMIN_DANGER_MENU = types.InlineKeyboardMarkup([
         [
             types.InlineKeyboardButton("Видалити користувача", callback_data=UserAction.admin_delete_account.name),
-            types.InlineKeyboardButton("Реєстрація користувачів (.csv)", callback_data=UserAction.admin_add_edbo_account.name),
-        ],
-        [
-            types.InlineKeyboardButton("Новий навчальний рік", callback_data=UserAction.admin_new_year.name),
+            types.InlineKeyboardButton("Видалити всі групи", callback_data=UserAction.admin_delete_groups.name),
         ],
     ])
 
@@ -223,22 +220,13 @@ class Keypads:
 
     REMOVE = types.ReplyKeyboardRemove(selective=False)
 
-    ADMIN_STATUS = types.ReplyKeyboardMarkup(
-        one_time_keyboard=True,
-        row_width=1,
-        resize_keyboard=1
-    ).row(
-        types.KeyboardButton("🔴"),
-        types.KeyboardButton("🟠"),
-        types.KeyboardButton("🟡"),
-        types.KeyboardButton("🟢")
-    )
-
-    # TODO: future
-    SEND_MESSAGE = types.InlineKeyboardMarkup(
-        [[types.InlineKeyboardButton("Відповісти", callback_data=UserAction.back_main_menu.name)]],
-    )
-
     MARK_ANSWERED = types.InlineKeyboardMarkup(
         [[types.InlineKeyboardButton("Приховати", callback_data=UserAction.mark_answered.name)]],
+    )
+
+    # TODO: download and upload files to server
+    ADMIN_LOAD_MENU = types.InlineKeyboardMarkup(
+        [
+            []
+        ]
     )

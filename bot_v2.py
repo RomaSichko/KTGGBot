@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import string
+from random import choice
 
 import telebot
 import key
@@ -63,6 +65,11 @@ def callback_messages(call):
 @bot.message_handler(content_types=['text'])
 def text_messages(message):
     ktgg_bot.text_handler(message)
+
+
+@bot.message_handler(content_types=['sticker'])
+def sticker_messages(sticker):
+    ktgg_bot.verify_sticker(sticker)
 
 
 bot.infinity_polling()

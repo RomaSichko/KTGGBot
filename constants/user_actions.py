@@ -5,7 +5,7 @@ class UserAction(enum.Enum):
     main_rules = enum.auto()
     main_faq = enum.auto()
     reset_password_without_account = enum.auto()
-    show_admin_online = enum.auto()
+    selection_committee = enum.auto()
     message_to_admin = enum.auto()
     back_main_menu = enum.auto()
     verify_student_ticket = enum.auto()
@@ -27,7 +27,6 @@ class UserAction(enum.Enum):
     admin_reset_pass_id = enum.auto()
     admin_reset_pass_pib = enum.auto()
     admin_send_message = enum.auto()
-    admin_change_status = enum.auto()
     admin_black_list = enum.auto()
     admin_danger_zone = enum.auto()
     admin_logout = enum.auto()
@@ -38,7 +37,7 @@ class UserAction(enum.Enum):
     admin_delete_account = enum.auto()
     admin_add_edbo_account = enum.auto()
     admin_new_groups = enum.auto()
-    admin_new_year = enum.auto()
+    admin_delete_groups = enum.auto()
     admin_black_list_add = enum.auto()
     admin_black_list_remove = enum.auto()
     admin_back_main_menu = enum.auto()
@@ -60,6 +59,7 @@ class UserAction(enum.Enum):
     teams_confirm_code_work = enum.auto()
 
     verify_work_account = enum.auto()
+    verify_remove_groups = enum.auto()
 
 
 class AdminRights(enum.Enum):
@@ -70,7 +70,7 @@ class AdminRights(enum.Enum):
     answer_message = enum.auto()
     reset_password = enum.auto()
     tasks = enum.auto()
-    start_year = enum.auto()
+    danger_zone = enum.auto()
 
 
 class SentFrom(enum.Enum):
