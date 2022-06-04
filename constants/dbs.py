@@ -3,6 +3,7 @@ class Dbs:
     system = "base.system"
     confirm_codes = "base.confirm_codes"
     messages = "base.messages"
+    black_list = "base.black_list"
 
 
 class MainDbs:

@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-import string
-from random import choice
-
 import telebot
 import key
 from bot_init import KTGGFunctions

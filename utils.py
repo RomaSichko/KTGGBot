@@ -259,20 +259,6 @@ class MicrosoftTeamsFunctions:
         self.logger.info(msg=f"User {user_id} not found")
         return False
 
-    # def valid_teams(self, user_mail):
-    #     headers = {
-    #         'Content-Type': 'application/json',
-    #         'Authorization': 'Bearer ' + self.authenticate,
-    #     }
-    #
-    #     result = requests.get(
-    #         f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=headers).json()
-    #
-    #     if 'error' in result:
-    #         return False
-    #     else:
-    #         return True
-
     def get_user_data(self, user_mail):
         result = requests.get(
             f'https://graph.microsoft.com/v1.0/users/{user_mail}', headers=self.headers).json()

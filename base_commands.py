@@ -34,8 +34,8 @@ class DbExecutor:
     def current_db(self):
         # TODO: change db
         payload = self.sql_template.format(
-            # sql_request=f"SELECT * FROM {Dbs.system} WHERE parameter = \'db\'",
-            sql_request=f"SELECT * FROM base.test_system WHERE parameter = \'db\'",
+            sql_request=f"SELECT * FROM {Dbs.system} WHERE parameter = \'db\'",
+            # sql_request=f"SELECT * FROM base.test_system WHERE parameter = \'db\'",
         )
         response = self.send_request(payload)
 
@@ -343,3 +343,54 @@ class DbExecutor:
             sql_request=f"UPDATE {Dbs.messages} SET {set_data} WHERE {filters}",
         )
         self.send_request(payload)
+
+    def add_to_black_list(self,
+                          added_by: int,
+                          telegram_id=None,
+                          telegram_nickname=None,
+                          reason=None,
+                          ) -> None:
+        """Add user to black list"""
+        if not telegram_id:
+            telegram_id = 0
+        payload = self.sql_template.format(
+            sql_request=f"INSERT INTO {Dbs.black_list} (added_by, reason, telegramId, telegramNickname) VALUE ({added_by}, \'{reason}\', {telegram_id}, \'{telegram_nickname}\')",
+        )
+
+        self.send_request(payload=payload)
+
+    def delete_from_black_list(self,
+                               telegram_id=None,
+                               telegram_nickname=None,
+                               ) -> None:
+        """Remove user from black list"""
+        if telegram_id:
+            payload = self.sql_template.format(
+                sql_request=f"DELETE FROM {Dbs.black_list} WHERE telegramId = {telegram_id}",
+            )
+        elif telegram_nickname:
+            payload = self.sql_template.format(
+                sql_request=f"DELETE FROM {Dbs.black_list} WHERE telegramNickname = \'{telegram_nickname}\'",
+            )
+
+        self.send_request(payload=payload)
+
+    def get_black_list(self) -> List:
+        """Get users from bl"""
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM {Dbs.black_list}",
+        )
+
+        return self.send_request(payload=payload)
+
+    def get_black_list_id(self,
+                          telegram_id=None,
+                          telegram_nickname=None,
+                          ) -> List:
+        """Get users from bl"""
+        filters = f"telegramId = {telegram_id}" if telegram_id else f"telegramNickname = \'{telegram_nickname}\'"
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM {Dbs.black_list} WHERE {filters}",
+        )
+
+        return self.send_request(payload=payload)

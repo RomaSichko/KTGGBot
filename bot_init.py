@@ -7,8 +7,6 @@ from telebot.types import Message
 
 import utils
 import os
-import codecs
-import json
 import base_commands
 from constants.dbs import TestDbs, MainDbs
 from constants.domains import Domains
@@ -221,7 +219,28 @@ class KTGGFunctions:
                 text=MessagesText.ADMIN_PANEL_DENIED,
             )
 
+    def get_user_in_black_list(self, call=None, message: Message = None):
+        if call:
+            telegram_id = call.message.chat.id
+            telegram_nickname = call.message.chat.username
+        elif message:
+            telegram_id = message.chat.id
+            telegram_nickname = message.chat.username
+
+        result_id = bool(self.db_user.get_black_list_id(telegram_id=telegram_id))
+        result_nick = bool(self.db_user.get_black_list_id(telegram_nickname=telegram_nickname))
+
+        return result_id or result_nick
+
     def callback_worker(self, call):
+
+        if self.get_user_in_black_list(call=call):
+            self.bot.send_message(
+                chat_id=call.message.chat.id,
+                text=MessagesText.USER_IN_BLACK_LIST
+            )
+            return
+
         new_calls = {
             UserAction.main_rules.name: self.call_main_rules_show,
             UserAction.main_faq.name: self.call_main_faq_show,
@@ -249,27 +268,12 @@ class KTGGFunctions:
             UserAction.admin_reset_pass_id.name: self.call_admin_reset_password_by_id,
             UserAction.admin_reset_pass_pib.name: self.call_admin_reset_password_by_pib,
             UserAction.admin_send_message.name: self.call_admin_send_message,
-            # UserAction.admin_black_list
-            # UserAction.admin_logout
-            # UserAction.admin_tasks_list
-            # UserAction.admin_tasks_status
-            # UserAction.admin_worker_edit
-            # UserAction.admin_tasks_questions
+            UserAction.admin_black_list.name: self.call_admin_black_list_menu,
             UserAction.admin_delete_account.name: self.call_admin_delete_account,
-            # UserAction.admin_add_edbo_account
-            # UserAction.admin_new_groups
             UserAction.admin_delete_groups.name: self.call_delete_groups,
-            # UserAction.admin_black_list_add
-            # UserAction.admin_black_list_remove
-            # UserAction.admin_back_main_menu
-            # UserAction.task_status_new
-            # UserAction.task_status_stoped
-            # UserAction.task_status_in_progress
-            # UserAction.task_status_done
-            # UserAction.task_executor_1
-            # UserAction.task_executor_2
-            # UserAction.task_executor_3
-            # UserAction.task_executor_4
+            UserAction.admin_black_list_add.name: self.call_admin_black_list_add,
+            UserAction.admin_black_list_remove.name: self.call_admin_black_list_remove,
+            UserAction.admin_back_main_menu.name: self.call_admin_back_main_menu,
             UserAction.mark_answered.name: self.call_admin_mark_answered,
         }
         new_calls[call.data](call)
@@ -278,6 +282,48 @@ class KTGGFunctions:
         self.bot.delete_message(
             chat_id=message.chat.id,
             message_id=message.id,
+        )
+
+    def call_admin_black_list_menu(self, call):
+        self._edit_message_call(
+            text=MessagesText.ADMIN_BLACK_LIST,
+            call=call,
+            reply_markup=Keypads.ADMIN_BLACK_LIST_MENU,
+        )
+
+    def call_admin_black_list_add(self, call):
+        self._remove_old_message_send_message_call(
+            text=MessagesText.ADMIN_ADD_TO_BLACK_LIST,
+            call=call,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def call_admin_black_list_remove(self, call):
+        text_template = "TelegramID: {0}\nTelegramNickname: {1}\nAddedBy: {2}\nReason: {3}\nTime: {4}\n"
+        users = ["---"]
+        for user in self.db_user.get_black_list():
+            users.append(text_template.format(
+                user["telegramId"],
+                user["telegramNickname"],
+                user["added_by"],
+                user["reason"],
+                datetime.datetime.utcfromtimestamp(user["__createdtime__"]/1000)
+            ))
+        self.bot.send_message(
+            chat_id=call.message.chat.id,
+            text="\n".join(users)
+        )
+        self._remove_old_message_send_message_call(
+            text=MessagesText.ADMIN_DELETE_FROM_BLACK_LIST,
+            call=call,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def call_admin_back_main_menu(self, call):
+        self._edit_message_call(
+            text=MessagesText.ADMIN_PANEL,
+            call=call,
+            reply_markup=Keypads.ADMIN_MAIN_MENU,
         )
 
     def call_main_rules_show(self, call):
@@ -605,6 +651,13 @@ class KTGGFunctions:
             self.text_cancel_message(message)
             return
 
+        if self.get_user_in_black_list(message=message):
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_IN_BLACK_LIST
+            )
+            return
+
         message_handle = {
             UserAction.message_to_admin.name: self.test_message_to_admin_main_menu,
             UserAction.verify_id_card.name: self.text_verify_id_card,
@@ -628,20 +681,10 @@ class KTGGFunctions:
             UserAction.admin_reset_pass_id.name: self.text_admin_reset_pass_id,
             UserAction.admin_reset_pass_pib.name: self.text_admin_reset_pass_pib,
             UserAction.admin_send_message.name: self.text_admin_send_message,
-            # UserAction.admin_change_status
-            # UserAction.admin_black_list
-            # UserAction.admin_worker_edit
-            # UserAction.admin_tasks_questions
             UserAction.admin_delete_account.name: self.text_delete_user,
-            # UserAction.admin_add_edbo_account
             UserAction.verify_remove_groups.name: self.text_admin_delete_groups,
-            # UserAction.admin_new_year
-            # UserAction.admin_black_list_add
-            # UserAction.admin_black_list_remove
-            # UserAction.task_executor_1
-            # UserAction.task_executor_2
-            # UserAction.task_executor_3
-            # UserAction.task_executor_4
+            UserAction.admin_black_list_add.name: self.text_admin_add_to_black_list,
+            UserAction.admin_black_list_remove.name: self.text_admin_delete_from_black_list,
         }
         action = self.db_user.get_user_action(
             telegram_id=message.chat.id,
@@ -653,6 +696,66 @@ class KTGGFunctions:
                 chat_id=message.chat.id,
                 text=MessagesText.UNKNOWN_ACTION,
             )
+
+    def text_admin_add_to_black_list(self, message: Message):
+        text = message.text.split()
+        if len(text) < 2:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.ADMIN_WRONG_BLACK_LIST,
+            )
+            return
+
+        try:
+            user_id = int(text[0])
+            self.db_user.add_to_black_list(
+                added_by=message.chat.id,
+                telegram_id=user_id,
+                reason=" ".join(text[1:])
+            )
+
+        except ValueError:
+            if text[0][0] == "@":
+                self.db_user.add_to_black_list(
+                    added_by=message.chat.id,
+                    telegram_nickname=text[0][1:],
+                    reason=" ".join(text[1:])
+                )
+            else:
+                self.bot.send_message(
+                    chat_id=message.chat.id,
+                    text=MessagesText.ADMIN_WRONG_BLACK_LIST,
+                )
+                return
+
+        self.bot.send_message(
+            chat_id=message.chat.id,
+            text=MessagesText.ADMIN_ADDED_BLACK_LIST,
+        )
+
+    def text_admin_delete_from_black_list(self, message: Message):
+        try:
+            user_id = int(message.text)
+            self.db_user.delete_from_black_list(
+                telegram_id=user_id,
+            )
+
+        except TypeError:
+            if message.text[0] == "@":
+                self.db_user.delete_from_black_list(
+                    telegram_nickname=message.text[1:],
+                )
+            else:
+                self.bot.send_message(
+                    chat_id=message.chat.id,
+                    text=MessagesText.ADMIN_WRONG_BLACK_LIST,
+                )
+                return
+
+        self.bot.send_message(
+            chat_id=message.chat.id,
+            text=MessagesText.ADMIN_DELETED_BLACK_LIST,
+        )
 
     def text_common_message_to_admin(self, message: Message, sent_from: SentFrom):
         message_topics = {

@@ -181,6 +181,9 @@ class Keypads:
             types.InlineKeyboardButton("Видалити користувача", callback_data=UserAction.admin_delete_account.name),
             types.InlineKeyboardButton("Видалити всі групи", callback_data=UserAction.admin_delete_groups.name),
         ],
+        [
+            types.InlineKeyboardButton("Видалити всі групи", callback_data=UserAction.admin_back_main_menu.name),
+        ]
     ])
 
     ADMIN_BLACK_LIST_MENU = types.InlineKeyboardMarkup([
