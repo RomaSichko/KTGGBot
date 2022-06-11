@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
-from typing import Any, Type, List, Union
+from typing import Any, List, Union
 
 import requests
 
-import utils
 import key
-from constants.dbs import MainDbs, Dbs
+import utils
+from constants.dbs import Dbs, MainDbs
 
 
 class DbExecutor:
+    """
+    Class to work with HarperDB API
+    https://harperdb.io/docs/harperdb-api/
+    """
+
     sql_template = "\n    \"operation\": \"sql\",\n    \"sql\": \"{sql_request}\"\n"
     db_type: MainDbs = None
 
@@ -19,36 +24,38 @@ class DbExecutor:
         url = key.get_base_key()
 
         headers = {
-            'Content-Type': 'application/json',
-            'Authorization': key.get_auth_base()
+            "Content-Type": "application/json",
+            "Authorization": key.get_auth_base(),
         }
 
         payload = "{" + payload + "}"
 
         response = requests.request("POST", url, headers=headers,
-                                    data=payload.encode('utf-8')).json()
+                                    data=payload.encode("utf-8")).json()
 
         self.logger.info(msg=f"db work, payload \n{payload} \nresponse: {response}")
         return response
 
-    def current_db(self):
-        # TODO: change db
+    def current_db(self, is_main_token: bool = True) -> List:
+        """Get current db"""
+        parameter = "db" if is_main_token else "db_test"
         payload = self.sql_template.format(
-            sql_request=f"SELECT * FROM {Dbs.system} WHERE parameter = \'db\'",
-            # sql_request=f"SELECT * FROM base.test_system WHERE parameter = \'db\'",
+            sql_request=f"SELECT * FROM {Dbs.system} WHERE parameter = \'{parameter}\'",
         )
         response = self.send_request(payload)
 
         return response[0]["value"]
 
-    def switch_db(self, new_db):
+    def switch_db(self, new_db, parameter: str = "db") -> None:
+        """Switch db"""
         payload = self.sql_template.format(
-            sql_request=f"UPDATE {Dbs.system} SET `value` = \'{new_db}\' WHERE parameter = \'db\'"
+            sql_request=f"UPDATE {Dbs.system} SET `value` = \'{new_db}\' WHERE parameter = \'{parameter}\'",
         )
 
         self.send_request(payload)
 
-    def get_user_action(self, telegram_id: int):
+    def get_user_action(self, telegram_id: int) -> Union[str, bool]:
+        """Get current user action"""
         payload = self.sql_template.format(
             sql_request=f"SELECT action FROM {self.db_type.user_actions} WHERE telegramID = {telegram_id}",
         )
@@ -57,7 +64,8 @@ class DbExecutor:
             return response[0]["action"]
         return False
 
-    def update_user_action(self, telegram_id: int, action: str):
+    def update_user_action(self, telegram_id: int, action: str) -> Any:
+        """Update user action"""
         response = self.get_user_action(telegram_id=telegram_id)
 
         if not response:
@@ -79,10 +87,12 @@ class DbExecutor:
 
         return self.send_request(payload)
 
-    def add_data_main_account(self, telegram_id: int, username: str):
+    def add_data_main_account(self, telegram_id: int, username: str) -> None:
+        """Add data to main account"""
         self.add_data(telegram_id=telegram_id, username=username, base=self.db_type.user_accounts)
 
-    def add_data_work_account(self, telegram_id: int, username: str):
+    def add_data_work_account(self, telegram_id: int, username: str) -> None:
+        """Add data to work account"""
         self.add_data(telegram_id=telegram_id, username=username, base=self.db_type.work_accounts)
 
     def update_user_email(self,
@@ -98,11 +108,13 @@ class DbExecutor:
         return self.send_request(payload)
 
     def update_user_email_main_account(self, telegram_id: int, mail: str) -> None:
+        """Update user email in main account"""
         self.update_user_email(telegram_id=telegram_id,
                                base=self.db_type.user_accounts,
                                mail=mail)
 
     def update_user_email_work_account(self, telegram_id: int, mail: str) -> None:
+        """Update user email in work account"""
         self.update_user_email(telegram_id=telegram_id,
                                base=self.db_type.work_accounts,
                                mail=mail)
@@ -113,20 +125,23 @@ class DbExecutor:
                           base: MainDbs,
                           user_name: str,
                           teams_status: bool = True) -> None:
-        """Update user email in db"""
+        """Update user teams in db"""
         payload = self.sql_template.format(
-            sql_request=f"UPDATE {base} SET teamsEmail = \'{mail}\', validTeams = {teams_status}, userName = \'{user_name}\' WHERE telegramID = {telegram_id}",
+            sql_request=(f"UPDATE {base} SET teamsEmail = \'{mail}\', validTeams = {teams_status}, "
+                         f"userName = \'{user_name}\' WHERE telegramID = {telegram_id}"),
         )
 
         self.send_request(payload)
 
     def update_user_teams_main_account(self, telegram_id: int, user_name: str, mail: str) -> None:
+        """Update user teams in main account"""
         self.update_user_teams(telegram_id=telegram_id,
                                user_name=user_name,
                                base=self.db_type.user_accounts,
                                mail=mail)
 
     def update_user_teams_work_account(self, telegram_id: int, user_name: str, mail: str) -> None:
+        """Update user teams in work account"""
         self.update_user_teams(telegram_id=telegram_id,
                                user_name=user_name,
                                base=self.db_type.work_accounts,
@@ -142,9 +157,11 @@ class DbExecutor:
         return bool(result)
 
     def check_user_in_work_base(self, telegram_id: int) -> bool:
+        """Check is user in db"""
         return self.check_user_in_base(telegram_id=telegram_id, base=self.db_type.work_accounts)
 
     def check_user_in_main_base(self, telegram_id: int) -> bool:
+        """Check is user in db"""
         return self.check_user_in_base(telegram_id=telegram_id, base=self.db_type.user_accounts)
 
     def get_valid_teams(self, telegram_id: int, base: MainDbs) -> bool:
@@ -155,12 +172,14 @@ class DbExecutor:
         )
         result = self.send_request(payload)
 
-        return bool(result[0]['validTeams'])
+        return bool(result[0]["validTeams"])
 
     def get_valid_teams_main_account(self, telegram_id: int) -> bool:
+        """Return status of teams account"""
         return self.get_valid_teams(telegram_id=telegram_id, base=self.db_type.user_accounts)
 
     def get_valid_teams_work_account(self, telegram_id: int) -> bool:
+        """Return status of teams account"""
         return self.get_valid_teams(telegram_id=telegram_id, base=self.db_type.work_accounts)
 
     def get_teams(self, telegram_id: int, base: MainDbs) -> str:
@@ -170,12 +189,14 @@ class DbExecutor:
         )
         result = self.send_request(payload)
 
-        return result[0]['teamsEmail']
+        return result[0]["teamsEmail"]
 
     def get_teams_main_account(self, telegram_id: int) -> str:
+        """Return teams account"""
         return self.get_teams(telegram_id=telegram_id, base=self.db_type.user_accounts)
 
     def get_teams_work_account(self, telegram_id: int) -> str:
+        """Return teams account"""
         return self.get_teams(telegram_id=telegram_id, base=self.db_type.work_accounts)
 
     def get_valid_mail(self, telegram_id: int, base: MainDbs) -> bool:
@@ -185,49 +206,37 @@ class DbExecutor:
         )
         result = self.send_request(payload)
 
-        return bool(result[0]['validMail'])
+        return bool(result[0]["validMail"])
 
     def get_valid_mail_main_account(self, telegram_id: int) -> bool:
+        """Get user valid_email status from db"""
         return self.get_valid_mail(telegram_id=telegram_id, base=self.db_type.user_accounts)
 
     def get_valid_mail_work_account(self, telegram_id: int) -> bool:
+        """Get user valid_email status from db"""
         return self.get_valid_mail(telegram_id=telegram_id, base=self.db_type.work_accounts)
-
-    # def get_teams(self, telegram_id: int, base: MainDbs) -> str:
-    #     """Get user teams login from db"""
-    #     payload = self.sql_template.format(
-    #         sql_request=f"SELECT teamsMail FROM {base} WHERE telegramID = {telegram_id}",
-    #     )
-    #     result = self.send_request(payload)
-    #
-    #     return result[0]['teamsMail']
-    #
-    # def get_teams_main_account(self, telegram_id: int) -> str:
-    #     return self.get_teams(telegram_id=telegram_id, base=self.db_type.user_accounts)
-    #
-    # def get_teams_work_account(self, telegram_id: int) -> str:
-    #     return self.get_teams(telegram_id=telegram_id, base=self.db_type.work_accounts)
 
     def get_user_data(self, telegram_id: int, base: MainDbs) -> dict:
         """Get all user data from db"""
         payload = self.sql_template.format(
             sql_request=f"SELECT * FROM {base} WHERE telegramID = {telegram_id}",
         )
-        result = self.send_request(payload)[0]
-        return result
+        return self.send_request(payload)[0]
 
     def get_user_data_main_account(self, telegram_id: int) -> dict:
+        """Return user data main account"""
         return self.get_user_data(telegram_id=telegram_id, base=self.db_type.user_accounts)
 
     def get_user_data_work_account(self, telegram_id: int) -> dict:
+        """Return user data work account"""
         return self.get_user_data(telegram_id=telegram_id, base=self.db_type.work_accounts)
 
     def get_admin(self, telegram_id: int) -> List:
+        """Get admin from table"""
         payload = self.sql_template.format(
             sql_request=f"SELECT * FROM {Dbs.admin} WHERE telegramId = {telegram_id}",
         )
-        result = self.send_request(payload)
-        return result
+        return self.send_request(payload)
 
     def add_user_email_code(self,
                             telegram_id: int,
@@ -295,11 +304,11 @@ class DbExecutor:
                           ) -> None:
         """Insert user message in db"""
         payload = self.sql_template.format(
-            sql_request=
-            f"INSERT INTO {Dbs.messages} "
-            f"(additionalData, mainIdMessage, message, sentFrom, topic, username, time, userId, status) "
-            f"VALUE (\'{additional_data}\', {main_id_message}, \'{message}\', \'{sent_from}\',"
-            f"\'{topic}\', \'{telegram_username}\', \'{time}\', {telegram_id}, false)"
+            sql_request=(
+                f"INSERT INTO {Dbs.messages} "
+                f"(additionalData, mainIdMessage, message, sentFrom, topic, username, time, userId, status) "
+                f"VALUE (\'{additional_data}\', {main_id_message}, \'{message}\', \'{sent_from}\',"
+                f"\'{topic}\', \'{telegram_username}\', \'{time}\', {telegram_id}, false)"),
         )
         self.send_request(payload)
 
@@ -307,7 +316,7 @@ class DbExecutor:
                             filters: str = None) -> List:
         """
         Returns list of messages by filters
-        :param filters: str like telegramId = 123456 AND topic = \'None\'
+        :param filters: str like telegramId = 123456 AND topic = 'None'
         :return: list of messages
         """
         if filters is None:
@@ -354,7 +363,9 @@ class DbExecutor:
         if not telegram_id:
             telegram_id = 0
         payload = self.sql_template.format(
-            sql_request=f"INSERT INTO {Dbs.black_list} (added_by, reason, telegramId, telegramNickname) VALUE ({added_by}, \'{reason}\', {telegram_id}, \'{telegram_nickname}\')",
+            sql_request=(
+                f"INSERT INTO {Dbs.black_list} (added_by, reason, telegramId, telegramNickname) "
+                f"VALUE ({added_by}, \'{reason}\', {telegram_id}, \'{telegram_nickname}\')"),
         )
 
         self.send_request(payload=payload)

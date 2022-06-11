@@ -1,43 +1,65 @@
 import datetime
-from random import randint, choice
-from typing import Union, List
-
-import telebot
-from telebot.types import Message
-
-import utils
 import os
+from random import choice, randint
+from typing import Union
+
 import base_commands
-from constants.dbs import TestDbs, MainDbs
+import telebot
+import utils
+from constants.dbs import MainDbs, TestDbs
 from constants.domains import Domains
 from constants.keypads import Keypads
 from constants.messages import MessagesText
-from constants.user_actions import UserAction, AdminRights, SentFrom
+from constants.user_actions import AdminRights, SentFrom, UserAction
+from telebot.types import Message
+
+from KTGGBot import key
 
 
 class KTGGFunctions:
 
     def __init__(self, bot: telebot.TeleBot):
+        """Initialization"""
         self.bot = bot
         self.ms_teams = utils.MicrosoftTeamsFunctions()
         self.db_user = base_commands.DbExecutor()
-        self.db_user.db_type = TestDbs if self.db_user.current_db() == "test" else MainDbs
+        self.db_user.db_type = TestDbs if self.db_user.current_db(
+            is_main_token=bot.token == key.get_main_bot_api()) == "test" else MainDbs
 
         self.main_id_message = self.db_user.get_last_message_id() + 1
 
-    def switch_db(self, message):
+    def switch_db(self, message: Message) -> None:
+        """Switch dbs, command switch"""
         db = message.text.split()[1]
-        # TODO: get permissions from db
-        if message.chat.id == 684828985:
+        if self._get_admin_right(
+                user_id=message.chat.id,
+                right=AdminRights.switch,
+        ):
+            parameter = "db_test"
+            if self.bot.token == key.get_main_bot_api():
+                parameter = "db"
+
             if db == "test":
                 self.db_user.db_type = TestDbs
             elif db == "main":
                 self.db_user.db_type = MainDbs
-            self.db_user.switch_db(db)
+            else:
+                self.bot.send_message(
+                    chat_id=message.chat.id,
+                    text="Invalid DB",
+                )
+                return
+
+            self.db_user.switch_db(db, parameter)
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=f"Changed db to {self.db_user.db_type.__name__}",
+            )
         else:
             self.bot.send_message(message.chat.id, "Access denied")
 
-    def welcome(self, message):
+    def welcome(self, message) -> None:
+        """Command start"""
         self.delete_user_last_message(message=message)
         self.bot.send_message(
             chat_id=message.chat.id,
@@ -45,7 +67,8 @@ class KTGGFunctions:
             reply_markup=Keypads.MAIN_MENU,
         )
 
-    def main_menu(self, message):
+    def main_menu(self, message) -> None:
+        """Command main menu"""
         self.db_user.update_user_action(
             telegram_id=message.chat.id,
             action=UserAction.back_main_menu.name,
@@ -60,7 +83,8 @@ class KTGGFunctions:
             reply_markup=Keypads.MAIN_MENU,
         )
 
-    def my_account(self, message):
+    def my_account(self, message) -> None:
+        """Coomand account"""
         self.delete_user_last_message(message=message)
         self._remove_keyboard(message)
         check = self.db_user.check_user_in_main_base(message.chat.id)
@@ -82,7 +106,7 @@ class KTGGFunctions:
             keypad = Keypads.ACCOUNT_MENU_NEW_ACCOUNT
             self.db_user.add_data_main_account(
                 telegram_id=message.chat.id,
-                username=message.chat.username
+                username=message.chat.username,
             )
             self.bot.send_message(
                 chat_id=message.chat.id,
@@ -101,6 +125,7 @@ class KTGGFunctions:
         )
 
     def work_account(self, message):
+        """Command account_work"""
         self.delete_user_last_message(message=message)
         self._remove_keyboard(message)
         check = self.db_user.check_user_in_work_base(message.chat.id)
@@ -140,7 +165,8 @@ class KTGGFunctions:
                 action=UserAction.verify_work_account.name,
             )
 
-    def action_photo(self, message):
+    def action_photo(self, message) -> None:
+        """Action for photo"""
         if self.db_user.get_user_action(message.chat.id) == UserAction.verify_student_ticket.name:
             self.bot.send_message(
                 chat_id=message.chat.id,
@@ -154,7 +180,7 @@ class KTGGFunctions:
 
             user_photo = f"image_{str(message.chat.id)}.jpg"
 
-            with open(user_photo, 'wb') as new_file:
+            with open(user_photo, "wb") as new_file:
                 new_file.write(downloaded_file)
 
             new_user_data = self.ms_teams.reset_password_by_student_ticket(user_photo)
@@ -165,7 +191,7 @@ class KTGGFunctions:
                     text=MessagesText.RESETED_PASSWORD.format(
                         login=new_user_data[2],
                         password=new_user_data[1],
-                    )
+                    ),
                 )
 
                 self.bot.send_message(
@@ -185,7 +211,7 @@ class KTGGFunctions:
             try:
                 os.remove(user_photo)
             except FileNotFoundError:
-                pass
+                self.db_user.logger.error("Image not found")
 
             self.delete_user_last_message(message)
 
@@ -195,17 +221,18 @@ class KTGGFunctions:
                 text=MessagesText.NOT_CONFIRMED_ACTION,
             )
 
-    def admin_panel(self, message):
+    def admin_panel(self, message) -> None:
+        """Command admin_panel"""
         self.delete_user_last_message(message=message)
         self._remove_keyboard(message=message)
 
         if self._get_admin_right(message.chat.id):
             if self._get_admin_right(message.chat.id, AdminRights.panel):
                 self.bot.send_message(
-                        chat_id=message.chat.id,
-                        text=MessagesText.ADMIN_PANEL,
-                        reply_markup=Keypads.ADMIN_MAIN_MENU,
-                    )
+                    chat_id=message.chat.id,
+                    text=MessagesText.ADMIN_PANEL,
+                    reply_markup=Keypads.ADMIN_MAIN_MENU,
+                )
                 self.db_user.update_user_action(message.chat.id,
                                                 UserAction.admin_back_main_menu.name)
             else:
@@ -219,7 +246,8 @@ class KTGGFunctions:
                 text=MessagesText.ADMIN_PANEL_DENIED,
             )
 
-    def get_user_in_black_list(self, call=None, message: Message = None):
+    def get_user_in_black_list(self, call=None, message: Message = None) -> bool:
+        """Returns is user in blacklist"""
         if call:
             telegram_id = call.message.chat.id
             telegram_nickname = call.message.chat.username
@@ -233,11 +261,11 @@ class KTGGFunctions:
         return result_id or result_nick
 
     def callback_worker(self, call):
-
+        """Handler for callbacks"""
         if self.get_user_in_black_list(call=call):
             self.bot.send_message(
                 chat_id=call.message.chat.id,
-                text=MessagesText.USER_IN_BLACK_LIST
+                text=MessagesText.USER_IN_BLACK_LIST,
             )
             return
 
@@ -276,29 +304,40 @@ class KTGGFunctions:
             UserAction.admin_back_main_menu.name: self.call_admin_back_main_menu,
             UserAction.mark_answered.name: self.call_admin_mark_answered,
         }
-        new_calls[call.data](call)
 
-    def delete_user_last_message(self, message):
+        try:
+            new_calls[call.data](call)
+        except KeyError:
+            self.bot.send_message(
+                chat_id=call.message.chat.id,
+                text=MessagesText.UNKNOWN_ACTION,
+            )
+
+    def delete_user_last_message(self, message) -> None:
+        """Delete last message"""
         self.bot.delete_message(
             chat_id=message.chat.id,
             message_id=message.id,
         )
 
-    def call_admin_black_list_menu(self, call):
+    def call_admin_black_list_menu(self, call) -> None:
+        """Change menu to admin_black_list"""
         self._edit_message_call(
             text=MessagesText.ADMIN_BLACK_LIST,
             call=call,
             reply_markup=Keypads.ADMIN_BLACK_LIST_MENU,
         )
 
-    def call_admin_black_list_add(self, call):
+    def call_admin_black_list_add(self, call) -> None:
+        """Calls add to blacklist"""
         self._remove_old_message_send_message_call(
             text=MessagesText.ADMIN_ADD_TO_BLACK_LIST,
             call=call,
             reply_markup=Keypads.CANCEL,
         )
 
-    def call_admin_black_list_remove(self, call):
+    def call_admin_black_list_remove(self, call) -> None:
+        """Calls remove from black list"""
         text_template = "TelegramID: {0}\nTelegramNickname: {1}\nAddedBy: {2}\nReason: {3}\nTime: {4}\n"
         users = ["---"]
         for user in self.db_user.get_black_list():
@@ -307,11 +346,11 @@ class KTGGFunctions:
                 user["telegramNickname"],
                 user["added_by"],
                 user["reason"],
-                datetime.datetime.utcfromtimestamp(user["__createdtime__"]/1000)
+                datetime.datetime.utcfromtimestamp(user["__createdtime__"] / 1000),
             ))
         self.bot.send_message(
             chat_id=call.message.chat.id,
-            text="\n".join(users)
+            text="\n".join(users),
         )
         self._remove_old_message_send_message_call(
             text=MessagesText.ADMIN_DELETE_FROM_BLACK_LIST,
@@ -319,104 +358,124 @@ class KTGGFunctions:
             reply_markup=Keypads.CANCEL,
         )
 
-    def call_admin_back_main_menu(self, call):
+    def call_admin_back_main_menu(self, call) -> None:
+        """Calls change menu to admin_menu"""
         self._edit_message_call(
             text=MessagesText.ADMIN_PANEL,
             call=call,
             reply_markup=Keypads.ADMIN_MAIN_MENU,
         )
 
-    def call_main_rules_show(self, call):
+    def call_main_rules_show(self, call) -> None:
+        """Calls show main rules"""
         self._edit_message_call(
             text=MessagesText.MAIN_RULES,
             reply_markup=Keypads.BACK_TO_MAIN_MENU,
             call=call,
         )
 
-    def call_main_faq_show(self, call):
+    def call_main_faq_show(self, call) -> None:
+        """Calls show faq"""
         self._edit_message_call(
             text=MessagesText.MAIN_FAQ,
             reply_markup=Keypads.BACK_TO_MAIN_MENU,
-            call=call
+            call=call,
         )
 
-    def call_reset_password_choice_verify_type(self, call):
+    def call_reset_password_choice_verify_type(self, call) -> None:
+        """Calls change keypad to choice_verify_type"""
         self._edit_message_call(
             text=MessagesText.RESET_PASSWORD_WITHOUT_ACC_CHOICE_VERIFY_TYPE,
             reply_markup=Keypads.TYPE_OF_RESET,
             call=call,
         )
 
-    def call_message_to_admin_call(self, call):
+    def call_message_to_admin_call(self, call) -> None:
+        """Calls message to admin"""
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_TO_ADMIN,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def call_back_to_main_menu(self, call):
+    def call_back_to_main_menu(self, call) -> None:
+        """Calls change menu to main_menu"""
         self._edit_message_call(
             text=MessagesText.MENU_MESSAGES,
             reply_markup=Keypads.MAIN_MENU,
-            call=call
+            call=call,
         )
 
-    def call_verify_type_student_ticket(self, call):
+    def call_verify_type_student_ticket(self, call) -> None:
+        """Calls verify by student ticket"""
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_STUDENT_TICKET_RESET_TYPE,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def call_verify_type_id_card(self, call):
+    def call_verify_type_id_card(self, call) -> None:
+        """Calls verify by id-card"""
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_ID_CARD_RESET_TYPE,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def call_edit_email_personal_account(self, call):
+    def call_edit_email_personal_account(self, call) -> None:
+        """Calls edit email personal account"""
         self.call_edit_email_account(call=call)
 
-    def call_edit_teams_personal_account(self, call):
+    def call_edit_teams_personal_account(self, call) -> None:
+        """Calls edit teams personal account"""
         self.call_edit_teams_account(call=call)
 
-    def call_edit_email_work_account(self, call):
+    def call_edit_email_work_account(self, call) -> None:
+        """Calls edit email work account"""
         self.call_edit_email_account(call=call)
 
-    def call_edit_teams_work_account(self, call):
+    def call_edit_teams_work_account(self, call) -> None:
+        """Calls edit teams work account"""
         self.call_edit_teams_account(call=call)
 
-    def call_add_email_personal_account(self, call):
+    def call_add_email_personal_account(self, call) -> None:
+        """Calls add email personal account"""
         self.call_add_email_account(call=call)
 
-    def call_add_teams_personal_account(self, call):
+    def call_add_teams_personal_account(self, call) -> None:
+        """Calls add teams personal account"""
         self.call_add_teams_account(call=call)
 
-    def call_add_email_work_account(self, call):
+    def call_add_email_work_account(self, call) -> None:
+        """Calls add email work account"""
         self.call_add_email_account(call=call)
 
-    def call_add_teams_work_account(self, call):
+    def call_add_teams_work_account(self, call) -> None:
+        """Calls add teams work account"""
         self.call_add_teams_account(call=call)
 
-    def call_message_to_admin_account(self, call):
+    def call_message_to_admin_account(self, call) -> None:
+        """Calls message to admin from main account"""
         self.call_message_to_admin_call(call=call)
 
-    def call_message_to_admin_work_account(self, call):
+    def call_message_to_admin_work_account(self, call) -> None:
+        """Calls message to admin from work account"""
         self.call_message_to_admin_call(call=call)
 
-    def call_message_other_to_admin_work_account(self, call):
+    def call_message_other_to_admin_work_account(self, call) -> None:
+        """Calls message to admin from work account other topic"""
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_TO_ADMIN_NO_TEAMS,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def call_reset_password_account(self, call):
+    def call_reset_password_account(self, call) -> None:
+        """Calls reset password main account"""
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_RESET_PASSWORD_ACCOUNT,
             reply_markup=Keypads.REMOVE,
-            call=call
+            call=call,
         )
         checker, password, user_id = self.ms_teams.reset_password(
             user_id=self.db_user.get_teams_main_account(telegram_id=call.message.chat.id),
@@ -437,11 +496,12 @@ class KTGGFunctions:
             )
             self.my_account(call.message)
 
-    def call_reset_password_account_work(self, call):
+    def call_reset_password_account_work(self, call) -> None:
+        """Calls reset password work account"""
         self._edit_message_call(
             text=MessagesText.MESSAGE_RESET_PASSWORD_ACCOUNT,
             reply_markup=Keypads.REMOVE,
-            call=call
+            call=call,
         )
         checker, password, user_id = self.ms_teams.reset_password(
             user_id=self.db_user.get_teams_work_account(telegram_id=call.message.chat.id),
@@ -462,7 +522,9 @@ class KTGGFunctions:
             )
             self.work_account(call.message)
 
-    def call_edit_data_work_account(self, call):
+    def call_edit_data_work_account(self, call) -> None:
+        """Not used"""
+        # Deprecated
         self._remove_old_message_send_message_call(
             text="Дана дія поки що недоступна",
             reply_markup=Keypads.CANCEL,
@@ -470,76 +532,56 @@ class KTGGFunctions:
         )
         self.work_account(call.message)
 
-    def call_add_email_account(self, call):
+    def call_add_email_account(self, call) -> None:
+        """Calls add email to main account"""
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_ADD_EMAIL_ACCOUNT,
             reply_markup=Keypads.CANCEL,
-            call=call
+            call=call,
         )
 
-    def call_add_teams_account(self, call):
+    def call_add_teams_account(self, call) -> None:
+        """Calls add email to main account"""
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_ADD_TEAMS_ACCOUNT,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def call_edit_email_account(self, call):
+    def call_edit_email_account(self, call) -> None:
+        """Calls edit email in main account"""
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_EDIT_EMAIL_ACCOUNT,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def call_edit_teams_account(self, call):
+    def call_edit_teams_account(self, call) -> None:
+        """Calls edit teams in main account"""
         self._remove_old_message_send_message_call(
             text=MessagesText.MESSAGE_EDIT_TEAMS_ACCOUNT,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def _edit_message_call(self, text: str, reply_markup: telebot.REPLY_MARKUP_TYPES, call):
-        self.bot.edit_message_text(
-            message_id=call.message.id,
-            chat_id=call.message.chat.id,
-            text=text,
-            reply_markup=reply_markup,
-        )
-        self.db_user.update_user_action(call.message.chat.id, call.data)
-
-    def _remove_old_message_send_message_call(self, text: str, reply_markup: telebot.REPLY_MARKUP_TYPES, call):
-        self.delete_user_last_message(message=call.message)
-        self.bot.send_message(
-            chat_id=call.message.chat.id,
-            text=text,
-            reply_markup=reply_markup,
-        )
-        self.db_user.update_user_action(call.message.chat.id, call.data)
-
-    def _get_admin_right(self, user_id: int, right: AdminRights = None) -> bool:
-        admin_in_db = self.db_user.get_admin(telegram_id=user_id)
-        if admin_in_db:
-            admin_in_db = admin_in_db[0]
-            if right:
-                return right.name in admin_in_db["rights"]
-            return True
-        return False
-
-    def call_admin_reset_password_by_id(self, call):
+    def call_admin_reset_password_by_id(self, call) -> None:
+        """Calls admin reset password by email"""
         self._remove_old_message_send_message_call(
             text=MessagesText.ADMIN_PANEL_RESET_PASSWORD_BY_ID,
             reply_markup=Keypads.CANCEL,
-            call=call
+            call=call,
         )
 
-    def call_admin_reset_password_by_pib(self, call):
+    def call_admin_reset_password_by_pib(self, call) -> None:
+        """Calls admin reset password by pib"""
         self._remove_old_message_send_message_call(
             text=MessagesText.ADMIN_PANEL_RESET_PASSWORD_BY_PIB,
             reply_markup=Keypads.CANCEL,
-            call=call
+            call=call,
         )
 
-    def call_admin_send_message(self, call):
+    def call_admin_send_message(self, call) -> None:
+        """Calls admin answer message"""
         # TODO: refactor message text
         if self._get_admin_right(call.message.chat.id, AdminRights.answer_message):
             messages = self.db_user.get_message_from_db()
@@ -570,24 +612,27 @@ class KTGGFunctions:
                 text=MessagesText.ADMIN_PANEL_WITHOUT_RIGHTS,
             )
 
-    def call_admin_mark_answered(self, call):
+    def call_admin_mark_answered(self, call) -> None:
+        """Calls to mark message as answered"""
         self.db_user.update_message(
             main_id_message=int(call.message.text.split()[1]),
         )
 
         self.delete_user_last_message(message=call.message)
 
-    def call_admin_delete_account(self, call):
+    def call_admin_delete_account(self, call) -> None:
+        """Calls admin delete user account"""
         self._remove_old_message_send_message_call(
             text=MessagesText.ADMIN_DELETE_ACCOUNTS,
             reply_markup=Keypads.CANCEL,
             call=call,
         )
 
-    def call_admin_danger_zone(self, call):
+    def call_admin_danger_zone(self, call) -> None:
+        """Calls to change admin panel"""
         if self._get_admin_right(
-            user_id=call.message.chat.id,
-            right=AdminRights.danger_zone,
+                user_id=call.message.chat.id,
+                right=AdminRights.danger_zone,
         ):
             self._remove_old_message_send_message_call(
                 text=MessagesText.ADMIN_PANEL_DANGER,
@@ -600,7 +645,8 @@ class KTGGFunctions:
                 text=MessagesText.ADMIN_PANEL_DENIED,
             )
 
-    def call_delete_groups(self, call):
+    def call_delete_groups(self, call) -> None:
+        """Calls to delete all groups"""
         self._remove_old_message_send_message_call(
             call=call,
             text=MessagesText.ADMIN_CALL_DELETE_GROUPS,
@@ -608,7 +654,8 @@ class KTGGFunctions:
         )
         self.sticker_send_random_sticker(call.message)
 
-    def sticker_send_random_sticker(self, message: Message):
+    def sticker_send_random_sticker(self, message: Message) -> None:
+        """Sends random sticker"""
         sticker_set = utils.get_random_sticker_set()
         sticker = choice(self.bot.get_sticker_set(name=sticker_set).stickers)
         self.bot.send_sticker(
@@ -616,9 +663,10 @@ class KTGGFunctions:
             sticker=sticker.file_id,
         )
 
-    def verify_sticker(self, message: Message):
-        if (self.db_user.get_user_action(telegram_id=message.chat.id) ==
-                UserAction.admin_delete_groups.name):
+    def verify_sticker(self, message: Message) -> None:
+        """Verify sticker from admin"""
+        if self.db_user.get_user_action(
+                telegram_id=message.chat.id) == UserAction.admin_delete_groups.name:
             if message.reply_to_message:
                 if message.reply_to_message.sticker.file_unique_id == message.sticker.file_unique_id:
                     self.bot.send_message(
@@ -646,7 +694,8 @@ class KTGGFunctions:
                 text=MessagesText.NOT_CONFIRMED_ACTION,
             )
 
-    def text_handler(self, message: Message):
+    def text_handler(self, message: Message) -> None:
+        """Handle text messages"""
         if message.text == "Відмінити":
             self.text_cancel_message(message)
             return
@@ -654,7 +703,7 @@ class KTGGFunctions:
         if self.get_user_in_black_list(message=message):
             self.bot.send_message(
                 chat_id=message.chat.id,
-                text=MessagesText.USER_IN_BLACK_LIST
+                text=MessagesText.USER_IN_BLACK_LIST,
             )
             return
 
@@ -697,7 +746,8 @@ class KTGGFunctions:
                 text=MessagesText.UNKNOWN_ACTION,
             )
 
-    def text_admin_add_to_black_list(self, message: Message):
+    def text_admin_add_to_black_list(self, message: Message) -> None:
+        """Add user from blacklist"""
         text = message.text.split()
         if len(text) < 2:
             self.bot.send_message(
@@ -711,7 +761,7 @@ class KTGGFunctions:
             self.db_user.add_to_black_list(
                 added_by=message.chat.id,
                 telegram_id=user_id,
-                reason=" ".join(text[1:])
+                reason=" ".join(text[1:]),
             )
 
         except ValueError:
@@ -719,7 +769,7 @@ class KTGGFunctions:
                 self.db_user.add_to_black_list(
                     added_by=message.chat.id,
                     telegram_nickname=text[0][1:],
-                    reason=" ".join(text[1:])
+                    reason=" ".join(text[1:]),
                 )
             else:
                 self.bot.send_message(
@@ -733,14 +783,15 @@ class KTGGFunctions:
             text=MessagesText.ADMIN_ADDED_BLACK_LIST,
         )
 
-    def text_admin_delete_from_black_list(self, message: Message):
+    def text_admin_delete_from_black_list(self, message: Message) -> None:
+        """Delete user from blacklist"""
         try:
             user_id = int(message.text)
             self.db_user.delete_from_black_list(
                 telegram_id=user_id,
             )
 
-        except TypeError:
+        except ValueError:
             if message.text[0] == "@":
                 self.db_user.delete_from_black_list(
                     telegram_nickname=message.text[1:],
@@ -757,12 +808,13 @@ class KTGGFunctions:
             text=MessagesText.ADMIN_DELETED_BLACK_LIST,
         )
 
-    def text_common_message_to_admin(self, message: Message, sent_from: SentFrom):
+    def text_common_message_to_admin(self, message: Message, sent_from: SentFrom) -> None:
+        """Common send message to admin"""
         message_topics = {
             SentFrom.main_menu: None,
             SentFrom.user_account: "Проблема користувача",
             SentFrom.work_account: "Проблема працівника (Teams)",
-            SentFrom.work_account_other: "Проблема працівника (Інше)"
+            SentFrom.work_account_other: "Проблема працівника (Інше)",
         }
 
         self.db_user.add_message_to_db(
@@ -788,32 +840,46 @@ class KTGGFunctions:
         self.main_id_message += 1
         self.main_menu(message)
 
-    def test_message_to_admin_main_menu(self, message: Message):
+    def test_message_to_admin_main_menu(self, message: Message) -> None:
+        """Send message from main menu to admin"""
         self.text_common_message_to_admin(
             message=message,
             sent_from=SentFrom.main_menu,
         )
 
-    def test_message_to_admin_account(self, message: Message):
+    def test_message_to_admin_account(self, message: Message) -> None:
+        """Send message from main account to admin teams topic"""
         self.text_common_message_to_admin(
             message=message,
             sent_from=SentFrom.user_account,
         )
 
-    def test_message_to_admin_work_account(self, message: Message):
+    def test_message_to_admin_work_account(self, message: Message) -> None:
+        """Send message from work account to admin teams topic"""
         self.text_common_message_to_admin(
             message=message,
             sent_from=SentFrom.work_account,
         )
 
-    def test_message_to_admin_work_account_other(self, message: Message):
+    def test_message_to_admin_work_account_other(self, message: Message) -> None:
+        """Send message from work account to admin other topic"""
         self.text_common_message_to_admin(
             message=message,
             sent_from=SentFrom.work_account_other,
         )
 
-    def text_verify_id_card(self, message: Message):
-        lastname, name, thirdname, passport = message.text.split()
+    def text_verify_id_card(self, message: Message) -> None:
+        """Verify id-card"""
+        text = message.text.split()
+        if len(text) != 4:
+            self.bot.send_message(
+                chat_id=message.chat.id,
+                text=MessagesText.USER_WRONG_TEXT,
+                reply_markup=Keypads.CANCEL,
+            )
+            return
+
+        lastname, name, thirdname, passport = text
         response = self.ms_teams.reset_password_by_passport(
             user_lastname=lastname,
             user_name=name,
@@ -834,11 +900,11 @@ class KTGGFunctions:
             self.bot.send_message(
                 chat_id=message.chat.id,
                 text=MessagesText.FAIL_TO_RESET_PASSWORD,
-                reply_markup=Keypads.CANCEL
+                reply_markup=Keypads.CANCEL,
             )
 
-    def text_admin_reset_pass_id(self, message: Message):
-        # TODO: refactor
+    def text_admin_reset_pass_id(self, message: Message) -> None:
+        """Admin action to reset password by email"""
         user_id = message.text
         if utils.valid_mail(user_id):
             response = self.ms_teams.reset_password(user_id=user_id)
@@ -858,8 +924,8 @@ class KTGGFunctions:
                 reply_markup=Keypads.CANCEL,
             )
 
-    def text_admin_reset_pass_pib(self, message: Message):
-        # TODO: refactor
+    def text_admin_reset_pass_pib(self, message: Message) -> None:
+        """Admin action to reset password by name and lastname"""
         name, lastname = message.text.split()
         response = self.ms_teams.reset_password_by_user_name(user_name=name,
                                                              user_lastname=lastname)
@@ -877,10 +943,11 @@ class KTGGFunctions:
             self.bot.send_message(
                 chat_id=message.chat.id,
                 text=MessagesText.FAIL_TO_RESET_PASSWORD,
-                reply_markup=Keypads.CANCEL
+                reply_markup=Keypads.CANCEL,
             )
 
-    def text_admin_send_message(self, message: Message):
+    def text_admin_send_message(self, message: Message) -> None:
+        """Method for answer admin"""
         if message.reply_to_message:
             split_message = message.reply_to_message.text.split()
             if "mainIdMessage:" not in split_message:
@@ -899,6 +966,7 @@ class KTGGFunctions:
 
             if message_db:
                 if not message_db[0]["status"]:
+                    print(chat_id)
                     self.bot.send_message(
                         chat_id=int(chat_id),
                         text=MessagesText.ADMIN_MESSAGE_ANSWER.format(
@@ -910,7 +978,7 @@ class KTGGFunctions:
                     )
                     self.db_user.update_message(
                         main_id_message=message_id,
-                        set_data=f"status = true, admin = {message.chat.id}, answer = \'{admin_answer}\'"
+                        set_data=f"status = true, admin = {message.chat.id}, answer = \'{admin_answer}\'",
                     )
                 else:
                     self.bot.send_message(
@@ -923,7 +991,8 @@ class KTGGFunctions:
                 text=MessagesText.WRONG_ADMIN_MESSAGE_REPLY,
             )
 
-    def text_delete_user(self, message: Message):
+    def text_delete_user(self, message: Message) -> None:
+        """Action to delete user from MS Teams"""
         message_text = message.text.split()
 
         if len(message_text) == 1:
@@ -945,14 +1014,14 @@ class KTGGFunctions:
 
         self.bot.reply_to(
             message=message,
-            text=text.format(name=message.text)
+            text=text.format(name=message.text),
         )
 
-    def text_admin_delete_groups(self, message: Message):
+    def text_admin_delete_groups(self, message: Message) -> None:
+        """Action to delete all groups from MS Teams"""
         ignored_groups = []
         if message.text.lower() != "all":
             ignored_groups = message.text.split(", ")
-        print(ignored_groups)
         result = self.ms_teams.delete_all_groups(ignored_groups=ignored_groups)
         if result:
             self.bot.send_message(
@@ -971,14 +1040,15 @@ class KTGGFunctions:
     def text_common_add_edit_account(self,
                                      message: Message,
                                      code_type: str,
-                                     user_action: UserAction):
+                                     user_action: UserAction) -> None:
+        """Common action to add emails to accounts"""
         self.delete_user_last_message(message=message)
         email = message.text
         if utils.valid_mail(email):
             self.bot.send_message(
                 chat_id=message.chat.id,
                 text=MessagesText.USER_ACCOUNT_CONFIRM_CODE.format(email=email),
-                reply_markup=Keypads.CANCEL
+                reply_markup=Keypads.CANCEL,
             )
 
             code = randint(10 ** 6, 10 ** 8)
@@ -998,24 +1068,27 @@ class KTGGFunctions:
             self.bot.send_message(
                 chat_id=message.chat.id,
                 text=MessagesText.USER_ACCOUNT_WRONG_MAIL,
-                reply_markup=Keypads.CANCEL
+                reply_markup=Keypads.CANCEL,
             )
 
-    def text_add_edit_email_account(self, message: Message):
+    def text_add_edit_email_account(self, message: Message) -> None:
+        """Add email to main account"""
         self.text_common_add_edit_account(
             message=message,
             code_type="email",
             user_action=UserAction.email_confirm_code,
         )
 
-    def text_add_edit_email_account_work(self, message: Message):
+    def text_add_edit_email_account_work(self, message: Message) -> None:
+        """Add email to work account"""
         self.text_common_add_edit_account(
             message=message,
             code_type="email",
             user_action=UserAction.email_confirm_code_work,
         )
 
-    def text_add_edit_teams_account(self, message: Message):
+    def text_add_edit_teams_account(self, message: Message) -> None:
+        """Add teams email to main account"""
         for domain in Domains:
             if domain.value in message.text:
                 self.text_common_add_edit_account(
@@ -1029,7 +1102,8 @@ class KTGGFunctions:
             text=MessagesText.USER_ACCOUNT_WRONG_TEAMS,
         )
 
-    def text_add_edit_teams_account_work(self, message: Message):
+    def text_add_edit_teams_account_work(self, message: Message) -> None:
+        """Add teams email to work account"""
         for domain in Domains:
             if domain.value in message.text:
                 self.text_common_add_edit_account(
@@ -1046,7 +1120,8 @@ class KTGGFunctions:
     def text_common_confirm_code_account(self,
                                          message: Message,
                                          code_type: str,
-                                         command):
+                                         command) -> None:
+        """Common method for confirms account emails"""
         self.delete_user_last_message(message=message)
         confirm_code = message.text
 
@@ -1091,33 +1166,38 @@ class KTGGFunctions:
                 reply_markup=Keypads.CANCEL,
             )
 
-    def text_email_confirm_code(self, message: Message):
+    def text_email_confirm_code(self, message: Message) -> None:
+        """Confirm main email"""
         self.text_common_confirm_code_account(message=message,
                                               code_type="email",
                                               command=self.db_user.update_user_email_main_account)
 
-    def text_teams_confirm_code(self, message: Message):
+    def text_teams_confirm_code(self, message: Message) -> None:
+        """Confirm main teams email"""
         self.text_common_confirm_code_account(message=message,
                                               code_type="teams",
                                               command=self.db_user.update_user_teams_main_account)
 
-    def text_email_confirm_code_work(self, message: Message):
+    def text_email_confirm_code_work(self, message: Message) -> None:
+        """Confirm work email"""
         self.text_common_confirm_code_account(message=message,
                                               code_type="email",
                                               command=self.db_user.update_user_email_work_account)
 
-    def text_teams_confirm_code_work(self, message: Message):
+    def text_teams_confirm_code_work(self, message: Message) -> None:
+        """Confirm work teams email"""
         self.text_common_confirm_code_account(message=message,
                                               code_type="teams",
                                               command=self.db_user.update_user_teams_work_account)
 
-    def text_verify_work_account(self, message: Message):
-        code, user_name, user_lastname, user_thirdname = message.text.split()
+    def text_verify_work_account(self, message: Message) -> None:
+        """Verify work account"""
+        code, user_lastname, user_name, user_thirdname = message.text.split()
         if utils.get_work_account_by_codes(
-            code=code,
-            user_name=user_name,
-            user_lastname=user_lastname,
-            user_thirdname=user_thirdname,
+                code=code,
+                user_name=user_name,
+                user_lastname=user_lastname,
+                user_thirdname=user_thirdname,
         ):
             self.bot.send_message(
                 chat_id=message.chat.id,
@@ -1143,7 +1223,8 @@ class KTGGFunctions:
                 text=MessagesText.USER_ACCOUNT_WORK_WRONG,
             )
 
-    def text_cancel_message(self, message: Message):
+    def text_cancel_message(self, message: Message) -> None:
+        """Cancel action"""
         self.db_user.update_user_action(
             telegram_id=message.chat.id,
             action=UserAction.back_main_menu.name,
@@ -1153,11 +1234,12 @@ class KTGGFunctions:
         else:
             self.main_menu(message=message)
 
-    def _remove_keyboard(self, message: Message):
+    def _remove_keyboard(self, message: Message) -> None:
+        """Remove keyboard"""
         msg = self.bot.send_message(
             chat_id=message.chat.id,
             text="REMOVE_KEYBOARD",
-            reply_markup=Keypads.REMOVE
+            reply_markup=Keypads.REMOVE,
         )
         self.bot.delete_message(
             chat_id=msg.chat.id,
@@ -1167,6 +1249,7 @@ class KTGGFunctions:
     def _generate_additional_data_message_to_admin(self,
                                                    telegram_id: int,
                                                    sent_from: SentFrom) -> Union[str, None]:
+        """Returns additional data from account"""
         if sent_from == SentFrom.main_menu:
             return None
         elif sent_from == SentFrom.user_account:
@@ -1175,3 +1258,36 @@ class KTGGFunctions:
             response = self.db_user.get_user_data_work_account(telegram_id=telegram_id)
 
         return f"email: {response['email']}, username: {response['userName']}, teams: {response['teamsEmail']}"
+
+    def _edit_message_call(self, text: str,
+                           reply_markup: telebot.REPLY_MARKUP_TYPES, call) -> None:
+        """Method for editing message"""
+        self.bot.edit_message_text(
+            message_id=call.message.id,
+            chat_id=call.message.chat.id,
+            text=text,
+            reply_markup=reply_markup,
+        )
+        self.db_user.update_user_action(call.message.chat.id, call.data)
+
+    def _remove_old_message_send_message_call(self, text: str,
+                                              reply_markup: telebot.REPLY_MARKUP_TYPES,
+                                              call) -> None:
+        """Method for delete old message and send new"""
+        self.delete_user_last_message(message=call.message)
+        self.bot.send_message(
+            chat_id=call.message.chat.id,
+            text=text,
+            reply_markup=reply_markup,
+        )
+        self.db_user.update_user_action(call.message.chat.id, call.data)
+
+    def _get_admin_right(self, user_id: int, right: AdminRights = None) -> bool:
+        """Get admin rights"""
+        admin_in_db = self.db_user.get_admin(telegram_id=user_id)
+        if admin_in_db:
+            admin_in_db = admin_in_db[0]
+            if right:
+                return right.name in admin_in_db["rights"]
+            return True
+        return False
