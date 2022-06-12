@@ -13,7 +13,7 @@ from constants.messages import MessagesText
 from constants.user_actions import AdminRights, SentFrom, UserAction
 from telebot.types import Message
 
-from KTGGBot import key
+import key
 
 
 class KTGGFunctions:
