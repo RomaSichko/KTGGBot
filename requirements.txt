@@ -1,0 +1,5 @@
+pyTelegramBotAPI
+msal
+opencv-python
+pyzbar
+requests
