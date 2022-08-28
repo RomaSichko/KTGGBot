@@ -19,11 +19,12 @@ from constants.dbs import DocumentType, JsonConstants
 def get_logger() -> logging.Logger:
     """Returns logger"""
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
+    if not logger.hasHandlers():
+        logger.setLevel(logging.DEBUG)
 
-    handler = logging.StreamHandler(stream=sys.stdout)
-    handler.setFormatter(logging.Formatter(fmt="[%(asctime)s: %(levelname)s] %(message)s"))
-    logger.addHandler(handler)
+        handler = logging.StreamHandler(stream=sys.stdout)
+        handler.setFormatter(logging.Formatter(fmt="[%(asctime)s: %(levelname)s] %(message)s"))
+        logger.addHandler(handler)
     return logger
 
 

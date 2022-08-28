@@ -313,6 +313,8 @@ class KTGGFunctions:
             UserAction.back_main_menu.name: self.call_back_to_main_menu,
             UserAction.verify_student_ticket.name: self.call_verify_type_student_ticket,
             UserAction.verify_id_card.name: self.call_verify_type_id_card,
+            UserAction.video_links.name: self.call_video_links,
+
             UserAction.edit_email_account.name: self.call_edit_email_personal_account,
             UserAction.edit_teams_account.name: self.call_edit_teams_personal_account,
             UserAction.reset_password_account.name: self.call_reset_password_account,
@@ -416,6 +418,20 @@ class KTGGFunctions:
         """Calls show faq"""
         self._edit_message_call(
             text=MessagesText.MAIN_FAQ,
+            reply_markup=Keypads.BACK_TO_MAIN_MENU,
+            call=call,
+        )
+
+    def call_video_links(self, call) -> None:
+        """Send links for videos from db"""
+        videos = self.db_user.get_video_links()
+        video_text = ""
+        for data in videos:
+            video_text += MessagesText.VIDEO_LINKS_BASE.format(name=data.get("videoName"),
+                                                               link=data.get("link"))
+
+        self._edit_message_call(
+            text=MessagesText.VIDEO_LINKS + video_text,
             reply_markup=Keypads.BACK_TO_MAIN_MENU,
             call=call,
         )
@@ -1348,6 +1364,7 @@ class KTGGFunctions:
             chat_id=call.message.chat.id,
             text=text,
             reply_markup=reply_markup,
+            disable_web_page_preview=True,
         )
         self.db_user.update_user_action(call.message.chat.id, call.data)
 

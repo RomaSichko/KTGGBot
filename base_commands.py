@@ -405,3 +405,9 @@ class DbExecutor:
         )
 
         return self.send_request(payload=payload)
+
+    def get_video_links(self) -> List:
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM {Dbs.video_links}",
+        )
+        return self.send_request(payload=payload)

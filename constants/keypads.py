@@ -11,8 +11,7 @@ class Keypads:
             types.InlineKeyboardButton("FAQ", callback_data=UserAction.main_faq.name)],
         [
             types.InlineKeyboardButton("Скинути пароль (Студенти)", callback_data=UserAction.reset_password_without_account.name),
-            # TODO: add selection_committee
-            # types.InlineKeyboardButton("Приймальна комісія", callback_data=UserAction.show_admin_online.name)
+            types.InlineKeyboardButton("Відеоінструкції", callback_data=UserAction.video_links.name)
         ],
         [
             types.InlineKeyboardButton("Написати адміністратору", callback_data=UserAction.message_to_admin.name),

@@ -7,6 +7,7 @@ class UserAction(enum.Enum):
     reset_password_without_account = enum.auto()
     selection_committee = enum.auto()
     message_to_admin = enum.auto()
+    video_links = enum.auto()
     back_main_menu = enum.auto()
     verify_student_ticket = enum.auto()
     verify_id_card = enum.auto()

@@ -313,3 +313,7 @@ class MessagesText:
     )
 
     FILE_UPDATED = "Файл успішно оновлено"
+
+    VIDEO_LINKS = "Нижче наведені інструкції з користування MS Teams та даним ботом:\n\n"
+
+    VIDEO_LINKS_BASE = "Назва інструкції: {name}\nПосилання: {link}\n-=====-\n"

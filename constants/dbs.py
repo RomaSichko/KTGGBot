@@ -4,6 +4,7 @@ class Dbs:
     confirm_codes = "base.confirm_codes"
     messages = "base.messages"
     black_list = "base.black_list"
+    video_links = "base.video_links"
 
 
 class MainDbs:
