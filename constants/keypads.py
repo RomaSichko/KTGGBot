@@ -182,6 +182,12 @@ class Keypads:
             types.InlineKeyboardButton("Видалити всі групи", callback_data=UserAction.admin_delete_groups.name),
         ],
         [
+            types.InlineKeyboardButton("Змінити файли баз",
+                                       callback_data=UserAction.admin_change_student_base.name),
+            types.InlineKeyboardButton("Отримати файли баз",
+                                       callback_data=UserAction.admin_get_student_base.name),
+        ],
+        [
             types.InlineKeyboardButton("Повернутися назад", callback_data=UserAction.admin_back_main_menu.name),
         ],
     ])

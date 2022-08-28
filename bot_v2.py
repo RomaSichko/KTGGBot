@@ -64,6 +64,11 @@ def text_messages(message):
     ktgg_bot.text_handler(message)
 
 
+@bot.message_handler(content_types=["document"])
+def document_message(document):
+    ktgg_bot.action_document(document)
+
+
 @bot.message_handler(content_types=["sticker"])
 def sticker_messages(sticker):
     """Trigger for stickers"""

@@ -24,6 +24,7 @@ class UserAction(enum.Enum):
     message_other_to_admin_work = enum.auto()
     add_email_account_work = enum.auto()
     add_teams_account_work = enum.auto()
+
     admin_reset_pass_id = enum.auto()
     admin_reset_pass_pib = enum.auto()
     admin_send_message = enum.auto()
@@ -41,6 +42,8 @@ class UserAction(enum.Enum):
     admin_black_list_add = enum.auto()
     admin_black_list_remove = enum.auto()
     admin_back_main_menu = enum.auto()
+    admin_change_student_base = enum.auto()
+    admin_get_student_base = enum.auto()
 
     mark_answered = enum.auto()
     cancel = enum.auto()

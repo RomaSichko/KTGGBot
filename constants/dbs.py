@@ -30,3 +30,8 @@ class DocumentType:
     id_card = "Паспорт громадянина України з безконтактним електронним носієм"
     birth_sertificate = "Свідоцтво про народження"
     passport = "Паспорт громадянина України"
+
+
+class Files:
+    students = "students.json"
+    teachers = "teacher.json"

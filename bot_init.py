@@ -6,12 +6,12 @@ from typing import Union
 import base_commands
 import telebot
 import utils
-from constants.dbs import MainDbs, TestDbs
+from constants.dbs import MainDbs, TestDbs, Files
 from constants.domains import Domains
 from constants.keypads import Keypads
 from constants.messages import MessagesText
 from constants.user_actions import AdminRights, SentFrom, UserAction
-from telebot.types import Message
+from telebot.types import Message, Document
 
 import key
 
@@ -221,6 +221,42 @@ class KTGGFunctions:
                 text=MessagesText.NOT_CONFIRMED_ACTION,
             )
 
+    def action_document(self, document) -> None:
+        """Replace file of bases"""
+        if (self.db_user.get_user_action(document.chat.id)
+                == UserAction.admin_change_student_base.name):
+            if document.document.file_name in [Files.students, Files.teachers]:
+                try:
+                    file_info = self.bot.get_file(file_id=document.document.file_id)
+                    file = self.bot.download_file(file_path=file_info.file_path)
+
+                    os.remove(document.document.file_name)
+
+                    with open(document.document.file_name, "wb") as new_file:
+                        new_file.write(file)
+                except Exception as exc:
+                    self.bot.send_message(
+                        chat_id=document.chat.id,
+                        text=MessagesText.UNKNOWN_ERROR.format(exc=exc),
+                    )
+                self.delete_user_last_message(message=document)
+                self._remove_keyboard(message=document)
+                self.bot.send_message(
+                    chat_id=document.chat.id,
+                    text=MessagesText.FILE_UPDATED,
+                    reply_markup=Keypads.ADMIN_DANGER_MENU,
+                )
+            else:
+                self.bot.send_message(
+                    chat_id=document.chat.id,
+                    text=MessagesText.UNKNOWN_FILE,
+                )
+        else:
+            self.bot.send_message(
+                chat_id=document.chat.id,
+                text=MessagesText.UNKNOWN_ACTION,
+            )
+
     def admin_panel(self, message) -> None:
         """Command admin_panel"""
         self.delete_user_last_message(message=message)
@@ -303,6 +339,8 @@ class KTGGFunctions:
             UserAction.admin_black_list_remove.name: self.call_admin_black_list_remove,
             UserAction.admin_back_main_menu.name: self.call_admin_back_main_menu,
             UserAction.mark_answered.name: self.call_admin_mark_answered,
+            UserAction.admin_change_student_base.name: self.call_admin_change_student_base,
+            UserAction.admin_get_student_base.name: self.call_admin_get_student_base,
         }
 
         try:
@@ -644,6 +682,45 @@ class KTGGFunctions:
                 chat_id=call.message.chat.id,
                 text=MessagesText.ADMIN_PANEL_DENIED,
             )
+
+    def call_admin_change_student_base(self, call):
+        file_student = Files.students
+        file_teacher = Files.teachers
+        file_update_time = os.path.getmtime(file_student)
+        file_teacher_updated_tile = os.path.getmtime(file_teacher)
+        text = "\n=====\n".join(
+            [
+                MessagesText.LAST_FILE_UPDATE.format(
+                    file=file_student,
+                    date=datetime.datetime.fromtimestamp(file_update_time),
+                ),
+                MessagesText.LAST_FILE_UPDATE.format(
+                    file=file_teacher,
+                    date=datetime.datetime.fromtimestamp(file_teacher_updated_tile),
+                ),
+            ]
+        )
+
+        self._remove_old_message_send_message_call(
+            call=call,
+            text=text,
+            reply_markup=Keypads.CANCEL,
+        )
+
+    def call_admin_get_student_base(self, call):
+        self.bot.send_document(
+            chat_id=call.message.chat.id,
+            document=open(Files.students, "rb"),
+        )
+        self.bot.send_document(
+            chat_id=call.message.chat.id,
+            document=open(Files.teachers, "rb"),
+        )
+        self.bot.send_message(
+            chat_id=call.message.chat.id,
+            text=MessagesText.ADMIN_PANEL_DANGER,
+            reply_markup=Keypads.ADMIN_DANGER_MENU,
+        )
 
     def call_delete_groups(self, call) -> None:
         """Calls to delete all groups"""
