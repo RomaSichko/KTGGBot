@@ -880,6 +880,10 @@ class KTGGFunctions:
             return
 
         lastname, name, thirdname, passport = text
+        self.bot.send_message(
+            chat_id=message.chat.id,
+            text=MessagesText.IN_PROGRESS,
+        )
         response = self.ms_teams.reset_password_by_passport(
             user_lastname=lastname,
             user_name=name,
