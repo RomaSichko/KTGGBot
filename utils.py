@@ -85,7 +85,7 @@ def get_username_by_student_ticket(img_name: str) -> Union[str, bool]:
         return False
 
     for student in student_base:
-        if student[JsonConstants.student_ticket] == "KB " + check_barcode:
+        if "KB " + check_barcode in student[JsonConstants.student_ticket]:
             name = student[JsonConstants.student_name].split()
             user_name = f"{name[1]} {name[0]}"
 
@@ -110,9 +110,9 @@ def get_username_by_passport(user_name: str,
 
         if name == user_all_name:
             if i[JsonConstants.document_type] == DocumentType.id_card:
-                user_card_doc = i[JsonConstants.document_number][-4:]
+                user_card_doc = str(i[JsonConstants.document_number])
 
-                if user_card_doc == user_card:
+                if user_card_doc.endswith(user_card):
                     user_name = f"{user_name} {user_lastname}"
 
     return user_name
@@ -173,6 +173,9 @@ class MicrosoftTeamsFunctions:
                 "password": password,
             },
         }
+
+        self.logger.info(f"Send request https://graph.microsoft.com/beta/users/{user_id}"
+                         f"\nData: {body}")
 
         response = requests.patch(
             f"https://graph.microsoft.com/beta/users/{user_id}", headers=self.headers,
@@ -240,6 +243,7 @@ class MicrosoftTeamsFunctions:
         """Sends email to user email with confirm code"""
         user_id = key.get_reply_mail()
         endpoint = f"https://graph.microsoft.com/v1.0/users/{user_id}/sendMail"
+        self.logger.info(f"Send request {endpoint}")
 
         email_msg = {
             "Message":
@@ -265,6 +269,7 @@ class MicrosoftTeamsFunctions:
                     user_name: str = None) -> bool:
         """Delete user from MS Teams platform by id or email"""
         if not user_id:
+            self.logger.info("Send request https://graph.microsoft.com/beta/users/")
             result = requests.get(
                 f"https://graph.microsoft.com/beta/users/", headers=self.headers).json()
 
@@ -288,6 +293,7 @@ class MicrosoftTeamsFunctions:
 
     def get_user_data(self, user_mail) -> str:
         """Returns username and lastname by user email"""
+        self.logger.info(f"Send request https://graph.microsoft.com/v1.0/users/{user_mail}")
         result = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_mail}", headers=self.headers).json()
 
@@ -301,6 +307,8 @@ class MicrosoftTeamsFunctions:
         while True:
             for current in result["value"]:
                 if current["displayName"] not in ignored_groups:
+                    self.logger.info(
+                        f"Send request https://graph.microsoft.com/v1.0/groups/{current['id']}")
                     delete_group = requests.delete(
                         url=f"https://graph.microsoft.com/v1.0/groups/{current['id']}",
                         headers=self.headers,
