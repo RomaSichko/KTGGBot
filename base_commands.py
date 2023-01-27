@@ -412,7 +412,7 @@ class DbExecutor:
         )
         return self.send_request(payload=payload)
 
-    def get_chat_members(self) -> list[dict]:
+    def get_chat_members(self) -> List[dict]:
         payload = self.sql_template.format(
             sql_request=f"SELECT * FROM {Dbs.chat_member}",
         )
