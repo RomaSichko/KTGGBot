@@ -5,7 +5,7 @@ import key
 from bot_init import KTGGFunctions
 
 # test bot
-bot = telebot.TeleBot(key.get_main_bot_api())
+bot = telebot.TeleBot(key.get_test_bot_api())
 
 ktgg_bot = KTGGFunctions(bot)
 

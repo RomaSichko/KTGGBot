@@ -234,7 +234,7 @@ class DbExecutor:
     def get_admin(self, telegram_id: int) -> List:
         """Get admin from table"""
         payload = self.sql_template.format(
-            sql_request=f"SELECT * FROM {Dbs.admin} WHERE telegramId = {telegram_id}",
+            sql_request=f"SELECT * FROM {Dbs.admin} WHERE telegramId = {telegram_id} AND status = 'Active'",
         )
         return self.send_request(payload)
 
@@ -323,7 +323,7 @@ class DbExecutor:
             filters = "status = false"
 
         payload = self.sql_template.format(
-            sql_request=f"SELECT * FROM {Dbs.messages} WHERE {filters}",
+            sql_request=f"SELECT * FROM {Dbs.messages} WHERE {filters} ORDER BY mainIdMessage",
         )
 
         return self.send_request(payload)
@@ -409,5 +409,11 @@ class DbExecutor:
     def get_video_links(self) -> List:
         payload = self.sql_template.format(
             sql_request=f"SELECT * FROM {Dbs.video_links}",
+        )
+        return self.send_request(payload=payload)
+
+    def get_chat_members(self) -> list[dict]:
+        payload = self.sql_template.format(
+            sql_request=f"SELECT * FROM {Dbs.chat_member}",
         )
         return self.send_request(payload=payload)

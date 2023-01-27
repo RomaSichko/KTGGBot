@@ -5,6 +5,7 @@ class Dbs:
     messages = "base.messages"
     black_list = "base.black_list"
     video_links = "base.video_links"
+    chat_member = "base.chat_member"
 
 
 class MainDbs:

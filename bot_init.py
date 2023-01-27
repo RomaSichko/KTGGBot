@@ -261,7 +261,7 @@ class KTGGFunctions:
         """Command admin_panel"""
         self.delete_user_last_message(message=message)
         self._remove_keyboard(message=message)
-
+        print(message.chat.type == "supergroup")
         if self._get_admin_right(message.chat.id):
             if self._get_admin_right(message.chat.id, AdminRights.panel):
                 self.bot.send_message(
@@ -344,13 +344,18 @@ class KTGGFunctions:
             UserAction.admin_change_student_base.name: self.call_admin_change_student_base,
             UserAction.admin_get_student_base.name: self.call_admin_get_student_base,
         }
-
         try:
             new_calls[call.data](call)
         except KeyError:
             self.bot.send_message(
                 chat_id=call.message.chat.id,
                 text=MessagesText.UNKNOWN_ACTION,
+            )
+
+        if str(call.message.chat.id)[:4] != "-100":
+            self._notify_channels(
+                notify_level=1,
+                notify_text=f"❕Дія користувача❕\n▫️{call.data}\n🔘{call.message.chat.id}\n⚪ @{call.message.chat.username}",
             )
 
     def delete_user_last_message(self, message) -> None:
@@ -639,7 +644,6 @@ class KTGGFunctions:
         # TODO: refactor message text
         if self._get_admin_right(call.message.chat.id, AdminRights.answer_message):
             messages = self.db_user.get_message_from_db()
-
             for message in messages:
                 self.bot.send_message(
                     chat_id=call.message.chat.id,
@@ -671,7 +675,10 @@ class KTGGFunctions:
         self.db_user.update_message(
             main_id_message=int(call.message.text.split()[1]),
         )
-
+        self._notify_channels(
+            notify_level=5,
+            notify_text=f"⚠️Повідомлення приховано ⚠️\n🆔 {call.message.text.split()[1]}\n©️ @{call.message.chat.username}",
+        )
         self.delete_user_last_message(message=call.message)
 
     def call_admin_delete_account(self, call) -> None:
@@ -834,9 +841,16 @@ class KTGGFunctions:
         try:
             message_handle[action](message=message)
         except KeyError:
-            self.bot.send_message(
-                chat_id=message.chat.id,
-                text=MessagesText.UNKNOWN_ACTION,
+            if str(message.chat.id)[:4] != "-100":
+                self.bot.send_message(
+                    chat_id=message.chat.id,
+                    text=MessagesText.UNKNOWN_ACTION,
+                )
+
+        if str(message.chat.id)[:4] != "-100":
+            self._notify_channels(
+                notify_level=1,
+                notify_text=f"❕Дія користувача❕\n▫️{action}\n🔘{message.chat.id}\n⚪ @{message.chat.username}",
             )
 
     def text_admin_add_to_black_list(self, message: Message) -> None:
@@ -926,8 +940,15 @@ class KTGGFunctions:
 
         self.bot.send_message(
             chat_id=message.chat.id,
-            text=MessagesText.MESSAGE_TO_ADMIN_SENDED,
+            text=MessagesText.MESSAGE_TO_ADMIN_SENDED.format(
+                id=self.main_id_message,
+            ),
             reply_markup=Keypads.REMOVE,
+        )
+
+        self._notify_channels(
+            notify_level=5,
+            notify_text=f"❗️Нове повідомлення виявлено❗️\n🆔 {self.main_id_message}\n📝 {message.text}",
         )
 
         self.main_id_message += 1
@@ -1067,15 +1088,22 @@ class KTGGFunctions:
                     self.bot.send_message(
                         chat_id=int(chat_id),
                         text=MessagesText.ADMIN_MESSAGE_ANSWER.format(
+                            id=message_id,
                             answer=admin_answer,
                         ))
                     self.bot.send_message(
                         chat_id=message.chat.id,
-                        text=MessagesText.ADMIN_MESSAGE_SENT,
+                        text=MessagesText.ADMIN_MESSAGE_SENT.format(
+                            id=message_id,
+                        ),
                     )
                     self.db_user.update_message(
                         main_id_message=message_id,
                         set_data=f"status = true, admin = {message.chat.id}, answer = \'{admin_answer}\'",
+                    )
+                    self._notify_channels(
+                        notify_level=5,
+                        notify_text=f"✅ На повідомлення відповіли ✅\n🆔 {message_id}\n💬 {admin_answer}\n©️ @{message.chat.username}",
                     )
                 else:
                     self.bot.send_message(
@@ -1389,3 +1417,13 @@ class KTGGFunctions:
                 return right.name in admin_in_db["rights"]
             return True
         return False
+
+    def _notify_channels(self, notify_text, notify_level):
+        chat_members = self.db_user.get_chat_members()
+        for chat in chat_members:
+            if notify_level >= chat["allowed_actions"]:
+                self.bot.send_message(
+                    chat_id=chat["chat_id"],
+                    text=notify_text,
+                )
+        return
