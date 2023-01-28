@@ -1422,8 +1422,10 @@ class KTGGFunctions:
         chat_members = self.db_user.get_chat_members()
         for chat in chat_members:
             if notify_level >= chat["allowed_actions"]:
-                self.bot.send_message(
-                    chat_id=chat["chat_id"],
-                    text=notify_text,
-                )
-        return
+                try:
+                    self.bot.send_message(
+                        chat_id=chat["chat_id"],
+                        text=notify_text,
+                    )
+                except Exception:
+                    print(f"Can`t send to {chat['chat_id']}")
