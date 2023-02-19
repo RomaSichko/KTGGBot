@@ -28,6 +28,17 @@ class KTGGFunctions:
 
         self.main_id_message = self.db_user.get_last_message_id() + 1
 
+    def try_except_messages(func):
+        def wrap(self, *args, **kwargs):
+            try:
+                func(self, *args, **kwargs)
+            except Exception as err:
+                self._notify_channels(
+                    notify_level=1,
+                    notify_text=f"💩💩💩💩💩\nКод коричневий, повторюю код коричневий\nВиявлена помилка в роботі бота \n❌ Метод: {func.__name__}\n❌ Помилка: {err.with_traceback(err.__traceback__)}",
+                )
+        return wrap
+
     def switch_db(self, message: Message) -> None:
         """Switch dbs, command switch"""
         db = message.text.split()[1]
@@ -165,6 +176,7 @@ class KTGGFunctions:
                 action=UserAction.verify_work_account.name,
             )
 
+    @try_except_messages
     def action_photo(self, message) -> None:
         """Action for photo"""
         if self.db_user.get_user_action(message.chat.id) == UserAction.verify_student_ticket.name:
@@ -261,7 +273,7 @@ class KTGGFunctions:
         """Command admin_panel"""
         self.delete_user_last_message(message=message)
         self._remove_keyboard(message=message)
-        print(message.chat.type == "supergroup")
+
         if self._get_admin_right(message.chat.id):
             if self._get_admin_right(message.chat.id, AdminRights.panel):
                 self.bot.send_message(
@@ -296,6 +308,7 @@ class KTGGFunctions:
 
         return result_id or result_nick
 
+    @try_except_messages
     def callback_worker(self, call):
         """Handler for callbacks"""
         if self.get_user_in_black_list(call=call):
@@ -794,6 +807,7 @@ class KTGGFunctions:
                 text=MessagesText.NOT_CONFIRMED_ACTION,
             )
 
+    @try_except_messages
     def text_handler(self, message: Message) -> None:
         """Handle text messages"""
         if message.text == "Відмінити":
@@ -1423,9 +1437,13 @@ class KTGGFunctions:
         for chat in chat_members:
             if notify_level >= chat["allowed_actions"]:
                 try:
+                    if self.bot.token == key.get_main_bot_api():
+                        additional_data = "🌈 MAIN BOT 🌈\n"
+                    else:
+                        additional_data = "💩 TEST BOT 💩\n"
                     self.bot.send_message(
                         chat_id=chat["chat_id"],
-                        text=notify_text,
+                        text=f"{additional_data}{notify_text}",
                     )
                 except Exception:
                     print(f"Can`t send to {chat['chat_id']}")
